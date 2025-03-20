@@ -19,7 +19,7 @@ class BluetoothRepository(private val context: Context) {
     private val advertiser: BluetoothLeAdvertiser? = bluetoothAdapter.bluetoothLeAdvertiser
     private val scanner: BluetoothLeScanner? = bluetoothAdapter.bluetoothLeScanner
 
-    fun startAdvertising(advertiseCallback: AdvertiseCallback) {
+    fun startAdvertisingWithUserId(userId: String, advertiseCallback: AdvertiseCallback) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_ADVERTISE) !=
             android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -33,14 +33,23 @@ class BluetoothRepository(private val context: Context) {
             .setConnectable(false)
             .build()
 
+        // מקצר את מזהה המשתמש ל-8 תווים כדי להתאים למגבלת גודל הפרסום
+        val shortenedUserId = userId.take(8)
+        val userIdBytes = shortenedUserId.toByteArray(Charsets.UTF_8)
+
+        // יצירת AdvertiseData – שימו לב למגבלת 31 בתים
         val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)
-            .addServiceUuid(android.os.ParcelUuid.fromString(SERVICE_UUID))
+            .setIncludeDeviceName(false)
+            .addServiceUuid(ParcelUuid.fromString(SERVICE_UUID))
+            // מוסיפים את מזהה המשתמש עם Manufacturer ID 0xFF
+            .addManufacturerData(0xFF, userIdBytes)
             .build()
+
+        Log.d("BLE", "מנסה להפעיל פרסום עם ID: $shortenedUserId (${userIdBytes.size} בתים)")
 
         try {
             advertiser?.startAdvertising(settings, data, advertiseCallback)
-            Log.d("BLE", "פתיחת Advertising")
+            Log.d("BLE", "פתיחת Advertising עם מזהה משתמש: $shortenedUserId")
         } catch (e: Exception) {
             Log.e("BLE", "שגיאה בפתיחת פרסום: ${e.message}")
         }
@@ -56,7 +65,7 @@ class BluetoothRepository(private val context: Context) {
 
         val filters = listOf(
             ScanFilter.Builder()
-                .setServiceUuid(android.os.ParcelUuid.fromString(SERVICE_UUID))
+                .setServiceUuid(ParcelUuid.fromString(SERVICE_UUID))
                 .build()
         )
         val settings = ScanSettings.Builder()
