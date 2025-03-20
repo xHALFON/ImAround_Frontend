@@ -5,5 +5,5 @@ data class AuthResponse(
     val username: String,
     val email: String,
     @SerializedName("accessToken") val token: String,
-    val refreshToken: String // Optional, if you want it
+    val refreshToken: String
 )

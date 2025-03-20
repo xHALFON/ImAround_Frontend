@@ -33,11 +33,11 @@ class BluetoothRepository(private val context: Context) {
             .setConnectable(false)
             .build()
 
-        // מקצר את מזהה המשתמש ל-8 תווים כדי להתאים למגבלת גודל הפרסום
+
         val shortenedUserId = userId.take(8)
         val userIdBytes = shortenedUserId.toByteArray(Charsets.UTF_8)
 
-        // יצירת AdvertiseData – שימו לב למגבלת 31 בתים
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid.fromString(SERVICE_UUID))
