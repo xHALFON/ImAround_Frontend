@@ -1,9 +1,8 @@
-package com.example.myapplication.ui.login
+package com.example.myapplication.ui.register
 
 import AuthResponse
-import LoginRequest
+import RegisterRequest
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,56 +17,59 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
-class LoginFragment : Fragment() {
+class RegisterFragment : Fragment() {
 
+    private lateinit var etUsername: EditText
     private lateinit var etEmail: EditText
     private lateinit var etPassword: EditText
-    private lateinit var btnLogin: Button
+    private lateinit var btnRegister: Button
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val view = inflater.inflate(R.layout.fragment_login, container, false)
+        val view = inflater.inflate(R.layout.fragment_register, container, false)
 
+        etUsername = view.findViewById(R.id.etUsername)
         etEmail = view.findViewById(R.id.etEmail)
         etPassword = view.findViewById(R.id.etPassword)
-        btnLogin = view.findViewById(R.id.btnLogin)
+        btnRegister = view.findViewById(R.id.btnRegister)
 
-        btnLogin.setOnClickListener {
-            loginUser()
+        btnRegister.setOnClickListener {
+            registerUser()
         }
 
         return view
     }
 
-    private fun loginUser() {
+    private fun registerUser() {
+        val username = etUsername.text.toString().trim()
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString().trim()
 
-        if (email.isEmpty() || password.isEmpty()) {
+        if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
             Toast.makeText(requireContext(), "Please fill all fields", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val request = LoginRequest(email, password)
+        val request = RegisterRequest(username, email, password)
 
-        RetrofitClient.authService.loginUser(request)
+        RetrofitClient.authService.registerUser(request)
             .enqueue(object : Callback<AuthResponse> {
                 override fun onResponse(
                     call: Call<AuthResponse>,
                     response: Response<AuthResponse>
                 ) {
                     if (response.isSuccessful) {
-                        Toast.makeText(requireContext(), "Login successful!", Toast.LENGTH_SHORT).show()
-                        findNavController().navigate(R.id.searchFragment)
+                        Toast.makeText(requireContext(), "Registered successfully!", Toast.LENGTH_SHORT).show()
+                        // TODO: Navigate to LoginFragment or MainFragment
+                        findNavController().navigate(R.id.action_registerFragment_to_welcomeFragment)
                     } else {
-                        Toast.makeText(requireContext(), "Invalid credentials", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "Registration failed", Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onFailure(call: Call<AuthResponse>, t: Throwable) {
-                    Log.e("LoginError", "Retrofit failed: ${t.localizedMessage}", t)
                     Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_LONG).show()
                 }
             })
