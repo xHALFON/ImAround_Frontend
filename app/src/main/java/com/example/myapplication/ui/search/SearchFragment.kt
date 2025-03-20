@@ -54,21 +54,11 @@ class SearchFragment : Fragment() {
             }
         }
 
-        // מאזינים לשינויים בתוצאות הסריקה
-        viewModel.discoveredDevices.observe(viewLifecycleOwner, Observer { devices ->
-            if (devices.isNotEmpty()) {
-                textResults.text = devices.joinToString(separator = "\n") { result ->
-                    val btDevice = result.device
-                    val deviceName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                            btDevice.name ?: "אלמוני"
-                        } else {
-                            "אלמוני (אין הרשאת CONNECT)"
-                        }
-                    } else {
-                        btDevice.name ?: "אלמוני"
-                    }
-                    "נמצא: $deviceName (${btDevice.address})"
+        // מאזינים לתגובת ה-backend עם רשימת המשתמשים
+        viewModel.usersResponse.observe(viewLifecycleOwner, Observer { users ->
+            if (users.isNotEmpty()) {
+                textResults.text = users.joinToString(separator = "\n") { user ->
+                    "שם: ${user.username}\nאימייל: ${user.email}"
                 }
             } else {
                 textResults.text = "לא נמצאו משתמשים"
@@ -78,7 +68,10 @@ class SearchFragment : Fragment() {
 
     private fun checkAndRequestPermissions(): Boolean {
         val permissionsToRequest = requiredPermissions.filter {
-            ContextCompat.checkSelfPermission(requireContext(), it) != PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                it
+            ) != PackageManager.PERMISSION_GRANTED
         }
         return if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
@@ -102,7 +95,11 @@ class SearchFragment : Fragment() {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 viewModel.startSearch()
             } else {
-                Toast.makeText(requireContext(), "הרשאות נדרשות לפעולת Bluetooth", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "הרשאות נדרשות לפעולת Bluetooth",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }

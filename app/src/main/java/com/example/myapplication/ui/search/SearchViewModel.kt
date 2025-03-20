@@ -11,38 +11,50 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
+import com.example.myapplication.api.BackendApi
+import com.example.myapplication.data.local.SessionManager
+import com.example.myapplication.data.model.UserResponse
 import com.example.myapplication.data.repository.BluetoothRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BluetoothRepository(application)
+    private val sessionManager = SessionManager(application)
+    private val backendApi = BackendApi()
 
-    // מזהה משתמש לדוגמה - בהמשך זה יגיע ממסד הנתונים
-    private val sampleUserId = "user123"
+    // משתמש – נקבל את ה-ID המעודכן מ־SessionManager
+    private var sampleUserId = "12345678"
 
-    // HashSet לשמירת מכשירים שכבר נמצאו כדי למנוע כפילויות
+    // HashSet לשמירת כתובות מכשירים שנמצאו (מניע כפילויות)
     private val discoveredDeviceAddresses = HashSet<String>()
+    // Set לשמירת מזהי משתמש חדשים (מה Manufacturer Data)
+    private val newRemoteUserIds = mutableSetOf<String>()
 
-    // רשימת התקנים שנתגלו
+    // LiveData להצגת התקנים שנתגלו (מה BLE)
     private val _discoveredDevices = MutableLiveData<MutableList<ScanResult>>(mutableListOf())
     val discoveredDevices: LiveData<MutableList<ScanResult>> = _discoveredDevices
 
-    // הודעות שגיאה
+    // LiveData להצגת רשימת המשתמשים מהבקר
+    private val _usersResponse = MutableLiveData<List<UserResponse>>()
+    val usersResponse: LiveData<List<UserResponse>> = _usersResponse
+
+    // LiveData להודעות שגיאה
     private val _errorMessage = MutableLiveData<String>()
     val errorMessage: LiveData<String> = _errorMessage
 
-    // Callback לסריקה
+    // Callback לסריקה – כאשר נמצא מכשיר, נחלץ את ה־ID (אם קיים)
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.let { scanResult ->
                 val btDevice = scanResult.device
                 val deviceAddress = btDevice.address
 
-                // בדיקה אם המכשיר כבר נמצא בעבר
                 if (!discoveredDeviceAddresses.contains(deviceAddress)) {
                     discoveredDeviceAddresses.add(deviceAddress)
 
-                    // בדיקה האם יש הרשאת BLUETOOTH_CONNECT במכשירים עם Android 12 ומעלה
                     val deviceName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (ContextCompat.checkSelfPermission(
                                 getApplication(),
@@ -57,23 +69,22 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                         btDevice.name ?: "אלמוני"
                     }
 
-                    // חיפוש מזהה משתמש בנתוני המכשיר (אם קיים)
+                    // ניסיון לפענח את מזהה המשתמש מהנתונים (Manufacturer Data)
                     var remoteUserId = "לא זוהה ID"
                     scanResult.scanRecord?.manufacturerSpecificData?.let { msd ->
                         if (msd.size() > 0) {
-                            // השתמש באותו Manufacturer ID שהוגדר בפרסום (0xFF בדוגמה)
-                            val manufacturerId = 0xFF
+                            val manufacturerId = 0xFF // אותו Manufacturer ID שהוגדר בפרסום
                             msd.get(manufacturerId)?.let { data ->
-                                // decode את כל המערך שהתקבל כ־UTF-8
                                 remoteUserId = String(data, Charsets.UTF_8)
                                 Log.d("BLE", "נמצא ID: $remoteUserId")
+                                if (remoteUserId != "לא זוהה ID") {
+                                    newRemoteUserIds.add(remoteUserId)
+                                }
                             }
                         }
                     }
 
                     Log.d("BLE", "נמצא התקן חדש: $deviceName - $deviceAddress - ID: $remoteUserId")
-
-                    // עדכון רשימת התצוגה
                     val list = _discoveredDevices.value ?: mutableListOf()
                     list.add(scanResult)
                     _discoveredDevices.postValue(list)
@@ -97,12 +108,31 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    init {
+        // Coroutine ששולח את רשימת המזהים כל 10 שניות אם קיימים חדשים
+        viewModelScope.launch {
+            while (true) {
+                delay(10000L) // 10 שניות
+                if (newRemoteUserIds.isNotEmpty()) {
+                    val idsToSend = newRemoteUserIds.toList()
+                    Log.d("BackendApi", "שליחת מזהים חדשים: $idsToSend")
+                    try {
+                        val response = backendApi.findUsers(idsToSend)
+                        _usersResponse.postValue(response)
+                    } catch (e: Exception) {
+                        _errorMessage.postValue("שגיאה בקריאת backend: ${e.message}")
+                    }
+                    newRemoteUserIds.clear()
+                }
+            }
+        }
+    }
+
     fun startSearch() {
-        // אתחול מחדש של הרשימה והמאגר (למקרה של חיפוש חוזר)
         _discoveredDevices.postValue(mutableListOf())
         discoveredDeviceAddresses.clear()
 
-        // הפעלת פרסום עם מזהה המשתמש והפעלת סריקה
+        sampleUserId = sessionManager.getUserId() ?: "123456"
         repository.startAdvertisingWithUserId(sampleUserId, advertiseCallback)
         repository.startScanning(scanCallback)
     }
