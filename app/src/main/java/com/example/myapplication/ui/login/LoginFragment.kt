@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.example.myapplication.R
+import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.data.network.RetrofitClient
 import retrofit2.Call
 import retrofit2.Callback
@@ -59,7 +60,12 @@ class LoginFragment : Fragment() {
                     response: Response<AuthResponse>
                 ) {
                     if (response.isSuccessful) {
+                        val userId = response.body()?.userId ?: ""
+                        val token = response.body()?.token ?: ""
+                        val sessionManager = SessionManager(requireContext())
+                        sessionManager.saveAuthData(userId, token)
                         Toast.makeText(requireContext(), "Login successful!", Toast.LENGTH_SHORT).show()
+                        Log.d("SessionCheck", "Saved userId: ${sessionManager.getUserId()}, token: ${sessionManager.getToken()}")
                         findNavController().navigate(R.id.searchFragment)
                     } else {
                         Toast.makeText(requireContext(), "Invalid credentials", Toast.LENGTH_SHORT).show()

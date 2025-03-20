@@ -1,4 +1,9 @@
+import com.google.gson.annotations.SerializedName
+
 data class AuthResponse(
-    val message: String,
-    val token: String? = null
+    @SerializedName("id") val userId: String,
+    val username: String,
+    val email: String,
+    @SerializedName("accessToken") val token: String,
+    val refreshToken: String // Optional, if you want it
 )
