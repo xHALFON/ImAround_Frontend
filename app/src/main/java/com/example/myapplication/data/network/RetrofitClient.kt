@@ -1,11 +1,12 @@
 package com.example.myapplication.data.network
 
 
+import CloudinaryService
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-
 object RetrofitClient {
-    private const val BASE_URL = "http://10.0.2.2:3000/"
+    private const val BASE_URL = "http://172.20.10.9:3000/"
 
     // יצירת Retrofit instance אחד
     private val retrofit: Retrofit by lazy {
@@ -25,3 +26,17 @@ object RetrofitClient {
         retrofit.create(SearchService::class.java)
     }
 }
+
+object CloudinaryClient {
+    private const val BASE_URL = "https://api.cloudinary.com/"
+
+    val service: CloudinaryService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(OkHttpClient.Builder().build())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(CloudinaryService::class.java)
+    }
+}
+
