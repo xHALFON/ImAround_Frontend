@@ -1,5 +1,7 @@
 package com.example.myapplication.ui.login
 
+import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -50,7 +52,7 @@ class LoginFragment : Fragment() {
         viewModel.authResponse.observe(viewLifecycleOwner, Observer { response ->
             Toast.makeText(requireContext(), "Login successful!", Toast.LENGTH_SHORT).show()
             // מעבר למסך הבא
-            findNavController().navigate(R.id.searchFragment)
+            findNavController().navigate(R.id.mainScreenFragment)
         })
 
         viewModel.errorMessage.observe(viewLifecycleOwner, Observer { error ->
