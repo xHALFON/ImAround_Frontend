@@ -77,6 +77,7 @@ dependencies {
     androidTestImplementation(composeBom)
 
     /* Compose */
+    implementation ("io.coil-kt:coil-compose:2.4.0")
     implementation("androidx.compose.material:material")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
