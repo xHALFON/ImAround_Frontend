@@ -14,12 +14,12 @@ import com.example.myapplication.ui.search.SearchScreen
 
 @Composable
 fun AppNavHost(navController: NavHostController) {
-    NavHost(navController = navController, startDestination = "welcome") {
-        composable("welcome") { WelcomeScreen(navController) }
+    NavHost(navController = navController, startDestination = "login") {
         composable("login") { LoginScreen(navController) }
         composable("register") { RegisterScreen(navController) }
         composable("main") { MainScreen(navController) }
         composable("profile") { ProfileScreen(navController) }
         composable("search") { SearchScreen(navController) }
+        composable("welcome") { WelcomeScreen(navController) }
     }
 }

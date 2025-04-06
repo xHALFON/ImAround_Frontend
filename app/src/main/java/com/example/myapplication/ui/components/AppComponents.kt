@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -43,6 +46,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -110,7 +115,10 @@ fun MyTextFieldComponent(
     labelValue: String,
     icon: ImageVector,
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier, // ✅ הוספנו
+    enabled: Boolean = true,        // ✅ הוספנו
+    readOnly: Boolean = false // ✅ חדש
 ) {
     OutlinedTextField(
         label = { Text(text = labelValue) },
@@ -126,6 +134,8 @@ fun MyTextFieldComponent(
         ),
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
+        enabled = enabled,
+        readOnly = readOnly, // ✅ כאן
         leadingIcon = {
             Icon(imageVector = icon, contentDescription = "input icon")
         },
@@ -357,8 +367,95 @@ fun AccountQueryComponent(
                 if (annonation.item == "Login") {
                     navController.navigate("Login")
                 } else if (annonation.item == "Register") {
-                    navController.navigate("Signup")
+                    navController.navigate("Register")
                 }
             }
     })
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateTextFieldComponent(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() } // ✅ כאן הלחיצה מתבצעת
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            label = { Text(label) },
+            readOnly = true,
+            enabled = true,
+            shape = MaterialTheme.shapes.medium,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = "Calendar Icon"
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = TextFieldDefaults.colors(
+                disabledIndicatorColor = GrayColor,
+                disabledLabelColor = AccentColor,
+                disabledLeadingIconColor = AccentColor,
+                disabledTextColor = TextColor
+            )
+        )
+    }
+}@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerField(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    // כדי למנוע focus ולשמור על click בלבד
+    val focusRequester = remember { FocusRequester() }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = {}, // read-only
+        label = { Text(label) },
+        readOnly = true,   // ✅ לא ניתן להקליד
+        enabled = true,    // ✅ נשאר בעיצוב רגיל
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        shape = MaterialTheme.shapes.medium, // בדיוק כמו השדות שלך
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.CalendarToday,
+                contentDescription = "Calendar Icon"
+            )
+        },
+        colors = TextFieldDefaults.colors(
+            focusedIndicatorColor = AccentColor,
+            unfocusedIndicatorColor = GrayColor,
+            focusedLeadingIconColor = AccentColor,
+            unfocusedLeadingIconColor = GrayColor,
+            focusedLabelColor = AccentColor,
+            unfocusedLabelColor = GrayColor
+        )
+    )
+}
+
+
+
+
+
+
+
+
+
