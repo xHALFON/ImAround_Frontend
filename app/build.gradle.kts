@@ -24,9 +24,7 @@ android {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
 
-    kotlinOptions {
-        jvmTarget = "19"
-    }
+
 
 
     buildTypes {
@@ -52,7 +50,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.compose)
@@ -77,8 +75,11 @@ dependencies {
     androidTestImplementation(composeBom)
 
     /* Compose */
+
+
     implementation ("io.coil-kt:coil-compose:2.4.0")
-    implementation("androidx.compose.material:material")
+    implementation("androidx.compose.material3:material3")
+
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

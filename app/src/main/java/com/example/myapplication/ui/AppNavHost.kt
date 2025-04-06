@@ -11,6 +11,7 @@ import com.example.myapplication.ui.profile.ProfileScreen
 import com.example.myapplication.ui.register.RegisterScreen
 import com.example.myapplication.ui.search.SearchScreen
 
+
 @Composable
 fun AppNavHost(navController: NavHostController) {
     NavHost(navController = navController, startDestination = "welcome") {
