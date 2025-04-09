@@ -4,6 +4,7 @@ package com.example.myapplication.ui.profile
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.model.User
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @Composable
 fun ProfileScreen(
@@ -51,68 +56,103 @@ fun ProfileScreen(
     }
 }
 @Composable
-fun UserProfileContent(user: User) {
+fun UserProfileContent(user: User, onEditClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
             .systemBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            elevation = CardDefaults.cardElevation(6.dp)
+            shape = MaterialTheme.shapes.large,
+            elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = rememberAsyncImagePainter(user.avatar),
-                    contentDescription = "Avatar",
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Column(
                     modifier = Modifier
-                        .size(120.dp)
-                        .padding(bottom = 16.dp)
-                )
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(modifier = Modifier.size(140.dp)) {
+                        Image(
+                            painter = rememberAsyncImagePainter(user.avatar),
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .size(140.dp)
+                                .align(Alignment.Center)
+                        )
 
-                Text(
-                    text = "${user.firstName} ${user.lastName}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
-                )
+                        IconButton(
+                            onClick = onEditClick,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(32.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                    shape = MaterialTheme.shapes.small
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Profile",
+                                tint = Color.White
+                            )
+                        }
+                    }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                UserInfoRow(label = "Email", value = user.email)
-                UserInfoRow(label = "Birth Date", value = user.birthDate)
-                UserInfoRow(label = "User ID", value = user._id)
+                    Text(
+                        text = "${user.firstName} ${user.lastName}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Divider()
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    UserInfoRow(Icons.Default.Email, "Email", user.email)
+                    UserInfoRow(Icons.Default.Cake, "Birth Date", user.birthDate)
+                    UserInfoRow(Icons.Default.Badge, "User ID", user._id)
+                }
             }
         }
     }
 }
 
 @Composable
-fun UserInfoRow(label: String, value: String) {
-    Column(
+fun UserInfoRow(icon: ImageVector, label: String, value: String) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge
-        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
     }
 }
 

@@ -5,15 +5,18 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
 
 @Composable
 fun SearchScreen(
@@ -70,11 +73,20 @@ fun SearchScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+
         if (users.isEmpty()) {
             Text("תוצאות סריקה יופיעו כאן")
         } else {
             users.forEach { user ->
-                Text("שם: ${user.username}\nאימייל: ${user.email}")
+                Image(
+                    painter = rememberAsyncImagePainter(user.avatar),
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(140.dp)
+
+                )
+
+                Text("שם: ${user.firstName} ${user.lastName}\nאימייל: ${user.email}")
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }
