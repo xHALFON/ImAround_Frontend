@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.profile
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
@@ -26,7 +27,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             try {
+                Log.d("InfoTrack", "ProfileViewModel: Sending req to Backend with userId: $userId")
                 val response = RetrofitClient.authService.getUserProfile(userId)
+                Log.d("InfoTrack", "ProfileViewModel: Response: $response")
                 userProfile.postValue(response)
             } catch (e: Exception) {
                 errorMessage.postValue(e.localizedMessage ?: "Profile loading failed")

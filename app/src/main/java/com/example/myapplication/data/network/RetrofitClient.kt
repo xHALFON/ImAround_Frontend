@@ -2,6 +2,7 @@ package com.example.myapplication.data.network
 
 
 import CloudinaryService
+import android.util.Log
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -18,6 +19,7 @@ object RetrofitClient {
 
     // שירות האימות
     val authService: AuthService by lazy {
+        Log.d("InfoTrack", "RetrofitClient: authService")
         retrofit.create(AuthService::class.java)
     }
 

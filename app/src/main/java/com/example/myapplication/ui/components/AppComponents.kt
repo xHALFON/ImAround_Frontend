@@ -24,11 +24,9 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
@@ -67,9 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
 import com.example.myapplication.ui.theme.AccentColor
-import com.example.myapplication.ui.theme.BgColor
 import com.example.myapplication.ui.theme.GrayColor
-import com.example.myapplication.ui.theme.Primary
 import com.example.myapplication.ui.theme.Secondary
 import com.example.myapplication.ui.theme.TextColor
 
@@ -372,43 +368,8 @@ fun AccountQueryComponent(
             }
     })
 }
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DateTextFieldComponent(
-    label: String,
-    value: String,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() } // ✅ כאן הלחיצה מתבצעת
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            label = { Text(label) },
-            readOnly = true,
-            enabled = true,
-            shape = MaterialTheme.shapes.medium,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = "Calendar Icon"
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = TextFieldDefaults.colors(
-                disabledIndicatorColor = GrayColor,
-                disabledLabelColor = AccentColor,
-                disabledLeadingIconColor = AccentColor,
-                disabledTextColor = TextColor
-            )
-        )
-    }
-}@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatePickerField(
     label: String,
@@ -449,6 +410,22 @@ fun DatePickerField(
             unfocusedLabelColor = GrayColor
         )
     )
+}
+
+
+
+@Composable
+fun ScanScreen(navController: NavHostController) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Scan Screen")
+    }
+}
+
+@Composable
+fun ChatScreen(navController: NavHostController) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Chat Screen")
+    }
 }
 
 

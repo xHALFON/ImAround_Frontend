@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.myapplication.ui.welcome.WelcomeScreen
+
 import com.example.myapplication.ui.login.LoginScreen
 import com.example.myapplication.ui.mainscreen.MainScreen
 import com.example.myapplication.ui.profile.ProfileScreen
@@ -20,6 +20,6 @@ fun AppNavHost(navController: NavHostController) {
         composable("main") { MainScreen(navController) }
         composable("profile") { ProfileScreen(navController) }
         composable("search") { SearchScreen(navController) }
-        composable("welcome") { WelcomeScreen(navController) }
+
     }
 }
