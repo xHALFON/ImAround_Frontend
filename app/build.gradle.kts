@@ -70,6 +70,7 @@ dependencies {
     /* Glide */
     implementation ("com.github.bumptech.glide:glide:4.16.0")
 
+
     val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -79,7 +80,7 @@ dependencies {
 
     implementation ("io.coil-kt:coil-compose:2.4.0")
     implementation("androidx.compose.material3:material3")
-
+    implementation ("com.github.smartword-app:compose-swipeable-cards:1.1.2")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
