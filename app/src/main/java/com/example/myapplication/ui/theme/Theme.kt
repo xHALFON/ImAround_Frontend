@@ -17,16 +17,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Primary,
-    secondary = Secondary,
-    tertiary = WhiteColor
+    primary = Pink,
+    secondary = Orange
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Primary,
-    secondary = Secondary,
-    tertiary = WhiteColor
+    primary = Pink,
+    secondary = Orange,
+    background = White4
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
@@ -66,6 +66,25 @@ fun SimpleLoginScreenTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
+}
+
+
+@Composable
+fun TinderCloneComposeTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colors = if (darkTheme) {
+        DarkColorScheme
+    } else {
+        LightColorScheme
+    }
+
+    MaterialTheme(
+        colorScheme = colors,
         typography = Typography,
         content = content
     )
