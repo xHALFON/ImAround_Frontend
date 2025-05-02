@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
@@ -20,65 +22,70 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.ui.components.BottomComponent
 import com.example.myapplication.ui.components.CheckboxComponent
 import com.example.myapplication.ui.components.DatePickerField
-
 import com.example.myapplication.ui.components.HeadingTextComponent
 import com.example.myapplication.ui.components.MyTextFieldComponent
 import com.example.myapplication.ui.components.NormalTextComponent
 import com.example.myapplication.ui.components.PasswordTextFieldComponent
+import com.example.myapplication.ui.hobbies.HobbyViewModel
 import java.util.*
-import coil.compose.rememberAsyncImagePainter
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.sp
 
 @Composable
 fun RegisterScreen(
     navController: NavHostController,
-    viewModel: RegisterViewModel = viewModel()
+    registerViewModel: RegisterViewModel = viewModel(),
+    hobbyViewModel: HobbyViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
 
-    var firstName by remember { mutableStateOf("") }
-    var lastName by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    // Use values stored in ViewModel
+    val firstName by remember { registerViewModel.firstName }
+    val lastName by remember { registerViewModel.lastName }
+    val email by remember { registerViewModel.email }
+    val password by remember { registerViewModel.password }
+    val dob by remember { registerViewModel.dob }
+    val imageUri by remember { registerViewModel.imageUri }
     var showPreviewDialog by remember { mutableStateOf(false) }
 
-    val authResponse by viewModel.authResponse.observeAsState()
-    val errorMessage by viewModel.errorMessage.observeAsState()
+    // Observe selected hobbies from the HobbyViewModel
+    val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
 
-    // בחירת תמונה
+    val authResponse by registerViewModel.authResponse.observeAsState()
+    val errorMessage by registerViewModel.errorMessage.observeAsState()
+
+    // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(GetContent()) { uri ->
-        imageUri = uri
-        if (uri != null) {
+        uri?.let {
+            registerViewModel.imageUri.value = it
             showPreviewDialog = true
         }
     }
 
-    // תאריך לידה
+    // Date picker
     fun showDatePicker() {
-        Log.d("RegisterScreen", "showDatePicker() called") // ✅ כאן
+        Log.d("RegisterScreen", "showDatePicker() called")
         val calendar = Calendar.getInstance()
         DatePickerDialog(context,
-            { _, y, m, d -> dob = "$d/${m + 1}/$y" },
+            { _, y, m, d -> registerViewModel.dob.value = "$d/${m + 1}/$y" },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).show()
     }
 
-    // ניהול תגובות
+    // Handle auth response
     LaunchedEffect(authResponse) {
         authResponse?.let {
             Toast.makeText(context, "Registered successfully!", Toast.LENGTH_SHORT).show()
@@ -86,12 +93,14 @@ fun RegisterScreen(
         }
     }
 
+    // Handle error messages
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
         }
     }
 
+    // Profile picture preview dialog
     if (showPreviewDialog && imageUri != null) {
         AlertDialog(
             onDismissRequest = { showPreviewDialog = false },
@@ -114,14 +123,14 @@ fun RegisterScreen(
                     Button(
                         onClick = { showPreviewDialog = false },
                         modifier = Modifier
-                            .fillMaxWidth(0.6f) // 60% מרוחב הדיאלוג
+                            .fillMaxWidth(0.6f)
                             .height(48.dp)
                     ) {
                         Text(text = "Save", fontSize = 18.sp)
                     }
                 }
             },
-            confirmButton = {}, // ננטרל את ברירת המחדל
+            confirmButton = {},
         )
     }
 
@@ -132,7 +141,11 @@ fun RegisterScreen(
             .background(Color.White)
             .padding(28.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
             NormalTextComponent(value = "Hello there,")
             HeadingTextComponent(value = "Create an Account")
             Spacer(modifier = Modifier.height(25.dp))
@@ -142,32 +155,32 @@ fun RegisterScreen(
                     labelValue = "First Name",
                     icon = Icons.Outlined.Person,
                     value = firstName,
-                    onValueChange = { firstName = it }
+                    onValueChange = { registerViewModel.firstName.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 MyTextFieldComponent(
                     labelValue = "Last Name",
                     icon = Icons.Outlined.Person,
                     value = lastName,
-                    onValueChange = { lastName = it }
+                    onValueChange = { registerViewModel.lastName.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 MyTextFieldComponent(
                     labelValue = "Email",
                     icon = Icons.Outlined.Email,
                     value = email,
-                    onValueChange = { email = it }
+                    onValueChange = { registerViewModel.email.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 PasswordTextFieldComponent(
                     labelValue = "Password",
                     icon = Icons.Outlined.Lock,
                     value = password,
-                    onValueChange = { password = it }
+                    onValueChange = { registerViewModel.password.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // תאריך לידה
+                // Date of birth
                 DatePickerField(
                     label = "Date of Birth",
                     value = dob,
@@ -175,7 +188,7 @@ fun RegisterScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // העלאת תמונה
+                // Profile image upload
                 Button(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     modifier = Modifier.fillMaxWidth()
@@ -183,8 +196,54 @@ fun RegisterScreen(
                     Text("Upload Profile Picture")
                 }
 
+                Spacer(modifier = Modifier.height(20.dp))
 
-                Spacer(modifier = Modifier.height(10.dp))
+                // Interests selection card - navigates to HobbySelectionScreen
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("hobby_selection") },
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Select Your Interests",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            if (selectedHobbies.isNotEmpty()) {
+                                Text(
+                                    text = "${selectedHobbies.size} interests selected",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF4A148C)
+                                )
+                            }
+                        }
+
+                        if (selectedHobbies.isEmpty()) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Add interests",
+                                tint = Color(0xFF4A148C)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Interests selected",
+                                tint = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 CheckboxComponent()
 
@@ -198,8 +257,19 @@ fun RegisterScreen(
                     onActionClick = {
                         if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || password.isBlank() || dob.isBlank()) {
                             Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                        } else if (selectedHobbies.isEmpty()) {
+                            Toast.makeText(context, "Please select at least one interest", Toast.LENGTH_SHORT).show()
+                            navController.navigate("hobby_selection")
                         } else {
-                            viewModel.registerUser(firstName, lastName, email, password, dob, imageUri)
+                            registerViewModel.registerUser(
+                                firstName = firstName,
+                                lastName = lastName,
+                                email = email,
+                                password = password,
+                                dob = dob,
+                                imageUri = imageUri,
+                                hobbies = selectedHobbies
+                            )
                         }
                     }
                 )
@@ -207,5 +277,3 @@ fun RegisterScreen(
         }
     }
 }
-
-
