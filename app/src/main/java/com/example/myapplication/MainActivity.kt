@@ -3,30 +3,39 @@ package com.example.myapplication
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.ui.AppNavHost
+import com.example.myapplication.ui.search.SearchViewModel
 import com.example.myapplication.ui.theme.SimpleLoginScreenTheme
 
-/*
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-    }
-}
-
- */
-
 class MainActivity : ComponentActivity() {
+
+    private lateinit var searchViewModel: SearchViewModel
+    private lateinit var sessionManager: SessionManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // יצירת שירותים
+        sessionManager = SessionManager(this)
+        searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
+
+        // טעינת מאצ'ים מיד כשהאפליקציה עולה אם המשתמש מחובר
+        if (sessionManager.getUserId() != null) {
+            searchViewModel.loadMatches()
+        }
+
         setContent {
             SimpleLoginScreenTheme {
                 val navController = rememberNavController()
-                AppNavHost(navController = navController)
+                AppNavHost(
+                    navController = navController,
+                    searchViewModel = searchViewModel
+                )
             }
         }
     }
