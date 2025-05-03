@@ -31,6 +31,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     var password = mutableStateOf("")
     var dob = mutableStateOf("")
     var imageUri = mutableStateOf<Uri?>(null)
+    var aboutMe = mutableStateOf("")
+    var occupation = mutableStateOf("")
 
     // We don't need to manage hobbies here anymore as it's handled by HobbyViewModel
 
@@ -41,6 +43,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         password: String,
         dob: String,
         imageUri: Uri?,
+        aboutMe: String,
+        occupation: String,
         hobbies: List<String> = emptyList()
     ) {
         viewModelScope.launch {
@@ -54,6 +58,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     lastName = lastName,
                     birthDate = dob,
                     avatar = imageUrl,
+                    about = aboutMe,
+                    occupation = occupation,
                     hobbies = hobbies
                 )
                 Log.d("RegisterViewModel", "Image URL to send: $imageUrl")

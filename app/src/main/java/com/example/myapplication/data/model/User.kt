@@ -7,4 +7,7 @@ data class User(
     val email: String,
     val birthDate: String,
     val avatar: String,
+    val occupation: String? = null,
+    val about: String? = null,
+    val hobbies: List<String>? = emptyList()
 )

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -57,6 +58,8 @@ fun RegisterScreen(
     val password by remember { registerViewModel.password }
     val dob by remember { registerViewModel.dob }
     val imageUri by remember { registerViewModel.imageUri }
+    val aboutMe by remember { registerViewModel.aboutMe }
+    val occupation by remember { registerViewModel.occupation }
     var showPreviewDialog by remember { mutableStateOf(false) }
 
     // Observe selected hobbies from the HobbyViewModel
@@ -151,6 +154,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(25.dp))
 
             Column {
+                // Basic info fields
                 MyTextFieldComponent(
                     labelValue = "First Name",
                     icon = Icons.Outlined.Person,
@@ -158,6 +162,7 @@ fun RegisterScreen(
                     onValueChange = { registerViewModel.firstName.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
+
                 MyTextFieldComponent(
                     labelValue = "Last Name",
                     icon = Icons.Outlined.Person,
@@ -165,6 +170,7 @@ fun RegisterScreen(
                     onValueChange = { registerViewModel.lastName.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
+
                 MyTextFieldComponent(
                     labelValue = "Email",
                     icon = Icons.Outlined.Email,
@@ -172,6 +178,7 @@ fun RegisterScreen(
                     onValueChange = { registerViewModel.email.value = it }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
+
                 PasswordTextFieldComponent(
                     labelValue = "Password",
                     icon = Icons.Outlined.Lock,
@@ -180,7 +187,7 @@ fun RegisterScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Date of birth
+                // Date of birth field
                 DatePickerField(
                     label = "Date of Birth",
                     value = dob,
@@ -188,7 +195,27 @@ fun RegisterScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Profile image upload
+                // "I work as" field - now right after Date of Birth
+                MyTextFieldComponent(
+                    labelValue = "I work as",
+                    icon = Icons.Outlined.Work,
+                    value = occupation,
+                    onValueChange = { registerViewModel.occupation.value = it }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // About Me field - now appears right after "I work as"
+                MyTextFieldComponent(
+                    labelValue = "About Me",
+                    icon = Icons.Outlined.Person,
+                    value = aboutMe,
+                    onValueChange = { registerViewModel.aboutMe.value = it },
+                    singleLine = false,
+                    maxLines = 5
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Profile picture upload
                 Button(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     modifier = Modifier.fillMaxWidth()
@@ -198,7 +225,7 @@ fun RegisterScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Interests selection card - navigates to HobbySelectionScreen
+                // Interests selection card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -268,6 +295,8 @@ fun RegisterScreen(
                                 password = password,
                                 dob = dob,
                                 imageUri = imageUri,
+                                aboutMe = aboutMe,
+                                occupation = occupation,
                                 hobbies = selectedHobbies
                             )
                         }
