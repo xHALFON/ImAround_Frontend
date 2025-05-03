@@ -14,10 +14,4 @@ import retrofit2.http.Path
 interface MatchingService {
     @POST("/match/like")
     suspend fun likeUser(@Body request: LikeRequest): LikeResponse
-
-    @GET("/match/ismatch/{userId}")
-    suspend fun checkMatches(@Path("userId") userId: String): MatchCheckResponse
-
-    @GET("/match/match/{matchId}")
-    suspend fun getMatchById(@Path("matchId") matchId: String): MatchResponseItem
 }
