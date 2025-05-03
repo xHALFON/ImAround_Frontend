@@ -66,8 +66,7 @@ fun ProfileScreen(
         user?.let {
             ProfileContent(
                 user = it,
-                onEditInterestsClick = { /* Navigate to edit interests */ },
-                onBackClick = { navController.popBackStack() }
+                onEditInterestsClick = { /* Navigate to edit interests */ }
             )
         } ?: run {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -80,36 +79,21 @@ fun ProfileScreen(
 @Composable
 fun ProfileContent(
     user: User,
-    onEditInterestsClick: () -> Unit,
-    onBackClick: () -> Unit
+    onEditInterestsClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Header with back button
+        // Keep the header space, but without the back button
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(32.dp)
-                    .background(
-                        color = Color.LightGray.copy(alpha = 0.3f),
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.DarkGray
-                )
-            }
+            // Empty box just for spacing
+            Spacer(modifier = Modifier.height(32.dp))
         }
 
         // Profile image and basic info
@@ -191,7 +175,7 @@ fun AboutSection(about: String) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "About",
+                text = "About Me",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Medium
             )
