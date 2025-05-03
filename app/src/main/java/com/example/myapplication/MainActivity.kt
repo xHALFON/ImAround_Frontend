@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -8,9 +9,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.data.local.SessionManager
+import com.example.myapplication.data.network.SocketManager
 import com.example.myapplication.ui.AppNavHost
 import com.example.myapplication.ui.search.SearchViewModel
 import com.example.myapplication.ui.theme.SimpleLoginScreenTheme
+import io.socket.client.Socket
 
 class MainActivity : ComponentActivity() {
 
@@ -19,6 +22,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         // יצירת שירותים
         sessionManager = SessionManager(this)
@@ -39,6 +43,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
 }
 
 @Preview(showBackground = true)

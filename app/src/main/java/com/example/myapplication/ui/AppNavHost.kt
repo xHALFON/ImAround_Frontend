@@ -24,35 +24,13 @@ fun AppNavHost(
 ) {
     val context = LocalContext.current
     val sessionManager = SessionManager(context)
-
+    val hobbyViewModel: HobbyViewModel = viewModel()
     NavHost(navController = navController, startDestination = "login") {
-        composable("login") {
-            LoginScreen(navController)
-        }
-
-        composable("register") {
-            RegisterScreen(navController)
-        }
-
-        composable("main") {
-            MainScreen(navController)
-        }
-
-        composable("profile") {
-            ProfileScreen(navController)
-        }
-
-        composable("search") {
-            // טעינת מאצ'ים בכל פעם שהמשתמש נכנס למסך החיפוש
-            searchViewModel?.let { viewModel ->
-                LaunchedEffect(Unit) {
-                    if (sessionManager.getUserId() != null) {
-                        viewModel.loadMatches()
-                    }
-                }
-
-                SearchScreen(navController = navController, viewModel = viewModel)
-            } ?: SearchScreen(navController = navController) // במקרה ש-viewModel הוא null
-        }
+        composable("login") { LoginScreen(navController) }
+        composable("register") { RegisterScreen(navController=navController,hobbyViewModel = hobbyViewModel) }
+        composable("hobby_selection") { HobbySelectionScreen(navController = navController, viewModel = hobbyViewModel)}
+        composable("main") { MainScreen(navController) }
+        composable("profile") { ProfileScreen(navController) }
+        composable("search") { SearchScreen(navController) }
     }
 }
