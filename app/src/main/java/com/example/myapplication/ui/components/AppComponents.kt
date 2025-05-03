@@ -112,9 +112,11 @@ fun MyTextFieldComponent(
     icon: ImageVector,
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier, // ✅ הוספנו
-    enabled: Boolean = true,        // ✅ הוספנו
-    readOnly: Boolean = false // ✅ חדש
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    singleLine: Boolean = true,     // ✅ Added for multi-line support
+    maxLines: Int = 1               // ✅ Added for multi-line support
 ) {
     OutlinedTextField(
         label = { Text(text = labelValue) },
@@ -128,14 +130,16 @@ fun MyTextFieldComponent(
             focusedLabelColor = AccentColor,
             unfocusedLabelColor = GrayColor
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         enabled = enabled,
-        readOnly = readOnly, // ✅ כאן
+        readOnly = readOnly,
         leadingIcon = {
             Icon(imageVector = icon, contentDescription = "input icon")
         },
-        keyboardOptions = KeyboardOptions.Default
+        keyboardOptions = KeyboardOptions.Default,
+        singleLine = singleLine,    // ✅ Added for multi-line support
+        maxLines = maxLines         // ✅ Added for multi-line support
     )
 }
 @OptIn(ExperimentalMaterial3Api::class)

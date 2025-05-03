@@ -1,6 +1,7 @@
 package com.example.myapplication.ui
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -11,6 +12,8 @@ import com.example.myapplication.ui.mainscreen.MainScreen
 import com.example.myapplication.ui.profile.ProfileScreen
 import com.example.myapplication.ui.register.RegisterScreen
 import com.example.myapplication.ui.search.SearchScreen
+import com.example.myapplication.ui.hobbies.HobbySelectionScreen
+import com.example.myapplication.ui.hobbies.HobbyViewModel
 import com.example.myapplication.ui.search.SearchViewModel
 import androidx.compose.ui.platform.LocalContext
 
