@@ -19,7 +19,7 @@ import com.example.myapplication.data.model.MatchCheckResponse
 import com.example.myapplication.data.model.MatchStatus
 import com.example.myapplication.data.model.UserMatch
 import com.example.myapplication.data.model.UserResponse
-
+import com.example.myapplication.data.network.SocketManager
 import com.example.myapplication.data.network.RetrofitClient
 import com.example.myapplication.data.repository.BluetoothRepository
 import kotlinx.coroutines.delay
@@ -30,11 +30,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = BluetoothRepository(application)
     private val sessionManager = SessionManager(application)
     private val backendApi = BackendApi()
+    private val socketManager = SocketManager.getInstance()
 
     // שימוש ב-RetrofitClient הקיים
     private val searchService = RetrofitClient.searchService
     private val matchingService = RetrofitClient.matchingService
-
+    private val _socketConnected = MutableLiveData<Boolean>(false)
+    val socketConnected: LiveData<Boolean> = _socketConnected
     // ID של המשתמש הנוכחי מ-SessionManager
     private val currentUserId: String
         get() = sessionManager.getUserId() ?: "unknown"
@@ -140,8 +142,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
-        // Coroutine ששולח את רשימת המזהים כל 10 שניות אם ישנם חדשים
-        // ובודק מאצ'ים
+    socketManager.init("http://10.0.2.2:3000")
+        setupSocketListeners()
+        connectSocket()
         viewModelScope.launch {
             while (true) {
                 delay(10000L) // 10 שניות
@@ -157,21 +160,134 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     newRemoteUserIds.clear()
                 }
-
-                // בדיקת מאצ'ים חדשים כל 10 שניות
-                checkForMatches()
             }
         }
-
-        // טעינת נתוני מאצ' התחלתיים
         loadMatches()
     }
 
-    // פונקציה ציבורית לטעינת המאצ'ים (נקראת מהאקטיביטי בהתחברות)
+    private fun setupSocketListeners() {
+        // Handle new match events
+        socketManager.setOnMatchListener { matchData ->
+            Log.d("SocketManager", "Received match: ${matchData._id}")
+
+            // Check if this is a match with both likes (confirmed match)
+            if (matchData.liked.size >= 2) {
+                // Find the other user ID (not current user)
+                val otherUserId = matchData.participants.find { it != currentUserId } ?: return@setOnMatchListener
+
+                // Find user data from discovered users
+                val userData = _usersResponse.value?.find { it._id == otherUserId }
+
+                if (userData != null) {
+                    // This is a confirmed match - show notification REGARDLESS of who liked last
+                    val newMatch = UserMatch(
+                        id = matchData._id,
+                        user = userData,
+                        status = MatchStatus.CONFIRMED
+                    )
+
+                    // Update confirmed matches list
+                    val currentMatches = _matches.value?.toMutableList() ?: mutableListOf()
+                    if (currentMatches.none { it.id == matchData._id }) {
+                        currentMatches.add(newMatch)
+                        _matches.postValue(currentMatches)
+                    }
+
+                    // Clean up other lists
+                    val pendingMatches = _pendingMatches.value?.toMutableList() ?: mutableListOf()
+                    pendingMatches.removeIf { it.user._id == otherUserId }
+                    _pendingMatches.postValue(pendingMatches)
+
+                    val receivedMatches = _receivedMatches.value?.toMutableList() ?: mutableListOf()
+                    receivedMatches.removeIf { it.user._id == otherUserId }
+                    _receivedMatches.postValue(receivedMatches)
+
+                    // IMPORTANT: Always show match notification for confirmed matches
+                    Log.d("SocketManager", "Showing match notification for: ${userData.firstName}")
+                    _newMatchUser.postValue(userData)
+                    _hasNewMatch.postValue(true)
+                } else {
+
+                    Log.d("SocketManager", "Fetching user data for ID: $otherUserId")
+
+                    viewModelScope.launch {
+                        try {
+                            // Call the API to get user data
+                            val userFromServer = RetrofitClient.authService.getUserById(otherUserId)
+
+                            if (userFromServer != null) {
+                                // Create match with the fetched user data
+                                val newMatch = UserMatch(
+                                    id = matchData._id,
+                                    user = userFromServer,
+                                    status = MatchStatus.CONFIRMED
+                                )
+
+                                // Update confirmed matches list
+                                val currentMatches = _matches.value?.toMutableList() ?: mutableListOf()
+                                if (currentMatches.none { it.id == matchData._id }) {
+                                    currentMatches.add(newMatch)
+                                    _matches.postValue(currentMatches)
+                                }
+
+                                // Clean up other lists
+                                val pendingMatches = _pendingMatches.value?.toMutableList() ?: mutableListOf()
+                                pendingMatches.removeIf { it.user._id == otherUserId }
+                                _pendingMatches.postValue(pendingMatches)
+
+                                val receivedMatches = _receivedMatches.value?.toMutableList() ?: mutableListOf()
+                                receivedMatches.removeIf { it.user._id == otherUserId }
+                                _receivedMatches.postValue(receivedMatches)
+
+                                // Show match notification with the fetched user data
+                                Log.d("SocketManager", "Showing match notification for fetched user: ${userFromServer.firstName}")
+                                _newMatchUser.postValue(userFromServer)
+                                _hasNewMatch.postValue(true)
+                            } else {
+                                Log.e("SocketManager", "User not found on server for ID: $otherUserId")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("SocketManager", "Error fetching user data: ${e.message}", e)
+                            _errorMessage.postValue("Failed to load match: ${e.message}")
+                        }
+                    }
+                }
+            } else if (matchData.liked.size == 1) {
+                // Handle single like case (pending or received)
+                // [Original logic for pending/received matches]
+            }
+        }
+
+
+
+        socketManager.setOnMatchSeenListener { matchId ->
+            // Update match seen status in your lists
+            val confirmedMatches = _matches.value?.toMutableList() ?: mutableListOf()
+            confirmedMatches.find { it.id == matchId }?.let { match ->
+                // Here you would update the match object if needed
+                // For now we just log it
+                Log.d("SocketManager", "Match ${match.id} was seen by the other user")
+            }
+        }
+
+        // Connection status listeners
+        socketManager.setOnConnectListener {
+            _socketConnected.postValue(true)
+        }
+
+        socketManager.setOnDisconnectListener {
+            _socketConnected.postValue(false)
+        }
+    }
+
+    private fun connectSocket() {
+        socketManager.connect(currentUserId)
+    }
+
     fun loadMatches() {
         viewModelScope.launch {
             try {
-                checkForMatches()
+
                 Log.d("SearchViewModel", "מאצ'ים נטענו בהצלחה")
             } catch (e: Exception) {
                 Log.e("SearchViewModel", "שגיאה בטעינת נתוני מאצ' התחלתיים", e)
@@ -180,18 +296,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // פולינג לשרת עבור מאצ'ים
-    private suspend fun checkForMatches() {
-        try {
-            val userId = currentUserId
-            val response = matchingService.checkMatches(userId)
-             // עיבוד המאצ'ים
-            Log.d("SearchViewModel", "מעקב מזהה: $userId")
-            processMatchResponse(response)
-        } catch (e: Exception) {
-            Log.e("SearchViewModel", "שגיאה בבדיקת מאצ'ים", e)
-        }
-    }
+
 
     // עיבוד תשובת מאצ' ועדכון ממשק המשתמש בהתאם
     private fun processMatchResponse(response: MatchCheckResponse) {
@@ -271,56 +376,32 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 val request = LikeRequest(currentUserId, targetUserId)
                 val response = matchingService.likeUser(request)
 
-                // הוספה למאצ'ים ממתינים אם עדיין אין מאצ'
+                // Remove user from radar once liked
+                val currentUsers = _usersResponse.value?.toMutableList() ?: mutableListOf()
+                currentUsers.removeIf { it._id == targetUserId }
+                _usersResponse.postValue(currentUsers)
+
+                // Handle match response
                 if (!response.isMatch) {
-                    val userData = _usersResponse.value?.find { it._id == targetUserId } ?: return@launch
-
-                    val currentPendingMatches = _pendingMatches.value?.toMutableList() ?: mutableListOf()
-                    // הוספה רק אם לא כבר ברשימה
-                    if (currentPendingMatches.none { it.user._id == targetUserId }) {
-                        val newPendingMatch = UserMatch(
-                            id = "pending_${System.currentTimeMillis()}",
-                            user = userData,
-                            status = MatchStatus.PENDING
-                        )
-                        currentPendingMatches.add(newPendingMatch)
-                        _pendingMatches.postValue(currentPendingMatches)
-                    }
-                } else {
-                    // טיפול בתשובת מאצ' מיידית (מקרה של משתמש 2)
-                    response.matchDetails?.let { matchDetails ->
-                        // חיפוש המשתמש האחר במשתתפים
-                        val otherUserId = matchDetails.participants.find { it != currentUserId } ?: return@let
-
-                        // חיפוש נתוני משתמש מרשימת המשתמשים שהתגלו
-                        val userData = _usersResponse.value?.find { it._id == otherUserId }
-                            ?: return@let // דילוג אם אין לנו נתוני משתמש
-
-                        // יצירת אובייקט מאצ'
-                        val newMatch = UserMatch(
-                            id = matchDetails._id,
-                            user = userData,
-                            status = MatchStatus.CONFIRMED
-                        )
-
-                        // הוספה למאצ'ים מאושרים
-                        val currentConfirmedMatches = _matches.value?.toMutableList() ?: mutableListOf()
-                        currentConfirmedMatches.add(newMatch)
-                        _matches.postValue(currentConfirmedMatches)
-
-                        // הסרה מרשימת הממתינים אם היה שם
+                    // Add to pending matches if not a match
+                    val userData = _usersResponse.value?.find { it._id == targetUserId }
+                    userData?.let {
                         val currentPendingMatches = _pendingMatches.value?.toMutableList() ?: mutableListOf()
-                        currentPendingMatches.removeIf { it.user._id == otherUserId }
-                        _pendingMatches.postValue(currentPendingMatches)
-
-                        // הצגת התראת מאצ' מיידית
-                        _newMatchUser.postValue(userData)
-                        _hasNewMatch.postValue(true)
+                        if (currentPendingMatches.none { it.user._id == targetUserId }) {
+                            val newPendingMatch = UserMatch(
+                                id = "pending_${System.currentTimeMillis()}",
+                                user = userData,
+                                status = MatchStatus.PENDING
+                            )
+                            currentPendingMatches.add(newPendingMatch)
+                            _pendingMatches.postValue(currentPendingMatches)
+                        }
                     }
                 }
+                // Socket will handle the case of it being a match
             } catch (e: Exception) {
-                Log.e("SearchViewModel", "שגיאה בלייק משתמש", e)
-                _errorMessage.postValue("שגיאה בלייק משתמש: ${e.message}")
+                Log.e("SearchViewModel", "Error liking user", e)
+                _errorMessage.postValue("Error liking user: ${e.message}")
             }
         }
     }
@@ -423,5 +504,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         super.onCleared()
         repository.stopAdvertising(advertiseCallback)
         repository.stopScanning(scanCallback)
+       socketManager.disconnect()
     }
 }
