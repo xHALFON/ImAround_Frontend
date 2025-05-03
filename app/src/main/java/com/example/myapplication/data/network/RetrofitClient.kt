@@ -27,6 +27,9 @@ object RetrofitClient {
     val searchService: SearchService by lazy {
         retrofit.create(SearchService::class.java)
     }
+    val matchingService: MatchingService by lazy {
+        retrofit.create(MatchingService::class.java)
+    }
 }
 
 object CloudinaryClient {

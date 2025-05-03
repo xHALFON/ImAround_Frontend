@@ -1,6 +1,6 @@
 package com.example.myapplication.api
 
-import FindUsersRequest
+import com.example.myapplication.data.model.FindUsersRequest
 import com.example.myapplication.data.model.UserResponse
 import com.example.myapplication.data.network.RetrofitClient
 import kotlinx.coroutines.Dispatchers
