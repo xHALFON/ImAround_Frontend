@@ -79,18 +79,7 @@ fun AppNavHost(
         }
 
 
+        composable("search") { SearchScreen(navController) }
 
-        composable("search") {
-            // טעינת מאצ'ים בכל פעם שהמשתמש נכנס למסך החיפוש
-            searchViewModel?.let { viewModel ->
-                LaunchedEffect(Unit) {
-                    if (sessionManager.getUserId() != null) {
-                        viewModel.loadMatches()
-                    }
-                }
-
-                SearchScreen(navController = navController, viewModel = viewModel)
-            } ?: SearchScreen(navController = navController) // במקרה ש-viewModel הוא null
-        }
     }
 }
