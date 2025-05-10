@@ -66,8 +66,11 @@ fun ProfileScreen(
         user?.let {
             ProfileContent(
                 user = it,
-                onEditInterestsClick = { /* Navigate to edit interests */ }
+                onEditInterestsClick = {
+                    navController.navigate("edit_profile")
+                }
             )
+
         } ?: run {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()

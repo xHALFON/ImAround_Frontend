@@ -170,9 +170,10 @@ fun HobbySelectionScreen(
             // Save button
             Button(
                 onClick = {
+                    onSaveComplete?.invoke() // 👈 Move this after popBackStack
                     navController.popBackStack()
-                    onSaveComplete?.invoke()
                 },
+
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
