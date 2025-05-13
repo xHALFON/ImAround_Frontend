@@ -5,7 +5,9 @@ import RegisterRequest
 import android.app.Application
 import android.net.Uri
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.network.RetrofitClient
@@ -22,13 +24,28 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     val authResponse = MutableLiveData<AuthResponse>()
     val errorMessage = MutableLiveData<String>()
 
+    // User registration data
+    var firstName = mutableStateOf("")
+    var lastName = mutableStateOf("")
+    var email = mutableStateOf("")
+    var password = mutableStateOf("")
+    var dob = mutableStateOf("")
+    var imageUri = mutableStateOf<Uri?>(null)
+    var aboutMe = mutableStateOf("")
+    var occupation = mutableStateOf("")
+
+    // We don't need to manage hobbies here anymore as it's handled by HobbyViewModel
+
     fun registerUser(
         firstName: String,
         lastName: String,
         email: String,
         password: String,
         dob: String,
-        imageUri: Uri?
+        imageUri: Uri?,
+        aboutMe: String,
+        occupation: String,
+        hobbies: List<String> = emptyList()
     ) {
         viewModelScope.launch {
             try {
@@ -40,9 +57,13 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     firstName = firstName,
                     lastName = lastName,
                     birthDate = dob,
-                    avatar = imageUrl
+                    avatar = imageUrl,
+                    about = aboutMe,
+                    occupation = occupation,
+                    hobbies = hobbies
                 )
                 Log.d("RegisterViewModel", "Image URL to send: $imageUrl")
+                Log.d("RegisterViewModel", "Hobbies to send: $hobbies")
                 val response = RetrofitClient.authService.registerUser(request)
                 authResponse.postValue(response)
             } catch (e: Exception) {

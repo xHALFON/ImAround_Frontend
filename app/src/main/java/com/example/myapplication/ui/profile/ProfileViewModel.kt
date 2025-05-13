@@ -9,6 +9,8 @@ import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.data.network.RetrofitClient
 import com.example.myapplication.model.User
 import kotlinx.coroutines.launch
+import retrofit2.Response
+
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -33,6 +35,27 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 userProfile.postValue(response)
             } catch (e: Exception) {
                 errorMessage.postValue(e.localizedMessage ?: "Profile loading failed")
+            }
+        }
+    }
+
+    fun updateUserProfile(id: String, updatedUser: User, onSuccess: () -> Unit, onError: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response: Response<User> = RetrofitClient.authService.updateUser(id, updatedUser)
+
+                if (response.isSuccessful && response.body() != null) {
+                    userProfile.postValue(response.body())
+                    onSuccess()
+                } else {
+                    Log.e("ProfileViewModel", "Update failed: ${response.errorBody()?.string()}")
+                    errorMessage.postValue("Update failed")
+                    onError()
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Update exception: ${e.message}")
+                errorMessage.postValue(e.localizedMessage ?: "Error updating profile")
+                onError()
             }
         }
     }

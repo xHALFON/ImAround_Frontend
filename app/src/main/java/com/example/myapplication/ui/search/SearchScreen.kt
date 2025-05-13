@@ -133,7 +133,8 @@ fun SearchScreen(
             },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            viewModel = viewModel
         )
 
         // Modern search button
@@ -240,14 +241,20 @@ fun MatchesIcon(
     pendingCount: Int,
     hasNewMatch: Boolean,
     onMatchesClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: SearchViewModel
 ) {
     val infiniteTransition = rememberInfiniteTransition()
+
+    // Get only received matches count for the badge
+    // Modified to show notifications only for receivedMatches
+    val receivedMatches by viewModel.receivedMatches.observeAsState(emptyList())
+    val receivedCount = receivedMatches.size
 
     // Animation for new match notification
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (hasNewMatch) 1.2f else 1f,
+        targetValue = if (hasNewMatch || receivedCount > 0) 1.2f else 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(500, easing = EaseInOutQuad),
             repeatMode = RepeatMode.Reverse
@@ -267,9 +274,9 @@ fun MatchesIcon(
         Card(
             modifier = Modifier
                 .size(56.dp)
-                .scale(if (hasNewMatch) scale else 1f)
+                .scale(if (hasNewMatch || receivedCount > 0) scale else 1f)
                 .graphicsLayer {
-                    if (hasNewMatch) rotationZ = rotationAngle
+                    if (hasNewMatch || receivedCount > 0) rotationZ = rotationAngle
                 }
                 .clickable { onMatchesClick() },
             shape = CircleShape,
@@ -293,8 +300,8 @@ fun MatchesIcon(
             }
         }
 
-        // Badge for number of matches
-        if (confirmedCount > 0 || pendingCount > 0) {
+        // Badge for received matches only
+        if (receivedCount > 0) {
             Box(
                 modifier = Modifier
                     .size(22.dp)
@@ -306,7 +313,7 @@ fun MatchesIcon(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if ((confirmedCount + pendingCount) > 9) "9+" else (confirmedCount + pendingCount).toString(),
+                    text = if (receivedCount > 9) "9+" else receivedCount.toString(),
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold
