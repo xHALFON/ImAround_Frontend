@@ -9,7 +9,6 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myapplication"
-        applicationId = "com.example.myapplication"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
@@ -23,10 +22,6 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
-
-
-
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -46,40 +41,26 @@ android {
 }
 
 dependencies {
-
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.material3.android)
-
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation (libs.socket.io.client)
-    /* login and register implementation */
     implementation ("com.squareup.retrofit2:retrofit:2.9.0")
     implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
-    /* nav graph! */
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
-    /* okhttp */
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    /* Glide */
     implementation ("com.github.bumptech.glide:glide:4.16.0")
-
-
     val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
-
-    /* Compose */
-
-
-    implementation ("io.coil-kt:coil-compose:2.4.0")
     implementation("androidx.compose.material3:material3")
     implementation ("com.github.smartword-app:compose-swipeable-cards:1.1.2")
     implementation("androidx.compose.foundation:foundation")
@@ -95,5 +76,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.5")
     implementation("androidx.compose.runtime:runtime-livedata")
     implementation("androidx.compose.runtime:runtime-rxjava2")
-
+    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("io.coil-kt:coil-compose:2.5.0")
 }

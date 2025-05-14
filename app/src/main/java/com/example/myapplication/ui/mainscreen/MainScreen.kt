@@ -27,13 +27,18 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.example.myapplication.R
-import com.example.myapplication.ui.components.ChatScreen
+
 import com.example.myapplication.ui.search.SearchScreen
 import com.example.myapplication.ui.profile.ProfileScreen
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.AccountCircle
-
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.myapplication.data.local.SessionManager
+import com.example.myapplication.ui.chat.ChatViewModel
+import com.example.myapplication.ui.chat.compose.ChatListScreen
+import com.google.gson.Gson
 
 
 sealed class BottomNavItem(val route: String, val icon: Any, val label: String) {
@@ -173,7 +178,29 @@ fun MainScreen(navController: NavHostController) {
 
             composable(BottomNavItem.Chat.route) {
                 Log.d("InfoTrack", "MainScreen: Showing Chat Screen")
-                ChatScreen(navController)
+
+                // השג את ה-context וה-sessionManager
+                val context = LocalContext.current
+                val sessionManager = SessionManager(context)
+
+                // אתחל את ה-viewModel
+                val chatViewModel: ChatViewModel = viewModel()
+
+                ChatListScreen(
+                    onChatSelected = { matchId, chatPartner ->
+                        // ניווט למסך צ'אט ספציפי
+                        val safeMatchId = matchId ?: ""
+                        val userId = chatPartner._id ?: ""
+                        val firstName = chatPartner.firstName ?: "User"
+                        val lastName = chatPartner.lastName ?: ""
+                        navController.navigate("chat_detail/$safeMatchId/$userId/$firstName/$lastName")
+                    },
+                    sessionManager = sessionManager,
+                    viewModel = chatViewModel,
+                    onBackClick = {
+                        // אפשר להשאיר ריק או להוסיף לוגיקה נוספת כאן אם צריך
+                    }
+                )
             }
         }
     }
