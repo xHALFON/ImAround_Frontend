@@ -30,6 +30,11 @@ object RetrofitClient {
     val matchingService: MatchingService by lazy {
         retrofit.create(MatchingService::class.java)
     }
+    // שירות הצ'אט
+    val chatService: ChatService by lazy {
+        Log.d("InfoTrack", "RetrofitClient: chatService")
+        retrofit.create(ChatService::class.java)
+    }
 }
 
 object CloudinaryClient {

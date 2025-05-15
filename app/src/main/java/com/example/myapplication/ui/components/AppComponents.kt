@@ -425,12 +425,7 @@ fun ScanScreen(navController: NavHostController) {
     }
 }
 
-@Composable
-fun ChatScreen(navController: NavHostController) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Chat Screen")
-    }
-}
+
 
 
 

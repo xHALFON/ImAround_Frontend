@@ -14,6 +14,7 @@ material3Android = "1.3.1"
 socketIoClient = "2.0.1"
 
 
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
