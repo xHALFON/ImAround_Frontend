@@ -138,12 +138,18 @@ class SocketManager() {
 
             socket.on("message_sent") { args ->
                 try {
+                    Log.d(TAG, "=== RECEIVED MESSAGE_SENT EVENT ===")
+                    Log.d(TAG, "Args length: ${args.size}")
+
                     if (args.isNotEmpty() && args[0] is JSONObject) {
                         val data = args[0] as JSONObject
                         Log.d(TAG, "Message sent confirmation: $data")
 
                         val messageResponse = gson.fromJson(data.toString(), MessageResponse::class.java)
+                        Log.d(TAG, "Calling onMessageSentListener")
                         onMessageSentListener?.invoke(messageResponse)
+                    } else {
+                        Log.e(TAG, "Invalid message_sent event data")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error handling sent message confirmation", e)
@@ -179,16 +185,23 @@ class SocketManager() {
             }
             socket.on("messages_read") { args ->
                 try {
+                    Log.d(TAG, "=== RECEIVED MESSAGES_READ EVENT ===")
+                    Log.d(TAG, "Args: ${args.toList()}")
+
                     if (args.isNotEmpty() && args[0] is JSONObject) {
                         val data = args[0] as JSONObject
-                        Log.d(TAG, "Messages read: $data")
+                        Log.d(TAG, "Messages read data: $data")
 
                         val messagesReadResponse = MessagesReadResponse(
                             matchId = data.getString("matchId"),
                             readBy = data.getString("readBy")
                         )
 
+                        Log.d(TAG, "Parsed MessagesReadResponse: $messagesReadResponse")
+                        Log.d(TAG, "Calling onMessagesReadListener")
                         onMessagesReadListener?.invoke(messagesReadResponse)
+                    } else {
+                        Log.e(TAG, "Invalid messages_read event data")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error handling messages read event", e)
@@ -228,6 +241,11 @@ class SocketManager() {
     fun markMessagesAsRead(chatId: String, userId: String, matchId: String) {
         socket?.let { socket ->
             if (socket.connected()) {
+                Log.d(TAG, "=== SENDING MARK AS READ ===")
+                Log.d(TAG, "Chat ID: $chatId")
+                Log.d(TAG, "User ID: $userId")
+                Log.d(TAG, "Match ID: $matchId")
+
                 val data = JSONObject().apply {
                     put("chatId", chatId)
                     put("userId", userId)

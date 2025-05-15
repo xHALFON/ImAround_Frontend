@@ -1,6 +1,7 @@
 package com.example.myapplication.data.network
 
 import com.example.myapplication.data.model.Chat
+import com.example.myapplication.data.model.UserResponse
 import retrofit2.http.GET
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -17,5 +18,7 @@ interface ChatService {
         @Path("chatId") chatId: String,
         @Path("userId") userId: String
     ): Map<String, Boolean>
+    @GET("chat/details/{userId}")
+    suspend fun getUserDetails(@Path("userId") userId: String): UserResponse
 
 }

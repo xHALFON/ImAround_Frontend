@@ -27,6 +27,8 @@ import com.example.myapplication.ui.search.SearchScreen
 import com.example.myapplication.ui.search.SearchViewModel
 import androidx.compose.ui.platform.LocalContext
 import com.google.gson.Gson
+import java.net.URLEncoder
+import java.net.URLDecoder
 
 @Composable
 fun AppNavHost(
@@ -90,15 +92,13 @@ fun AppNavHost(
         composable("chat_list") {
             ChatListScreen(
                 onChatSelected = { matchId, chatPartner ->
-                    // שנה ל
                     val safeMatchId = matchId ?: ""
-                    val firstName = chatPartner.firstName ?: "User"
-                    val lastName = chatPartner.lastName ?: ""
+                    val firstName = URLEncoder.encode(chatPartner.firstName ?: "", "UTF-8")
+                    val lastName = URLEncoder.encode(chatPartner.lastName ?: "", "UTF-8")
                     val userId = chatPartner._id ?: ""
-                    val email = chatPartner.email ?: ""
-                    val avatar = chatPartner.avatar ?: ""
+                    val avatar = URLEncoder.encode(chatPartner.avatar ?: "", "UTF-8")
 
-                    navController.navigate("chat_detail/$safeMatchId/$userId/$firstName/$lastName")
+                    navController.navigate("chat_detail/$safeMatchId/$userId/$firstName/$lastName/$avatar")
                 },
                 sessionManager = sessionManager,
                 viewModel = chatViewModel,
@@ -107,29 +107,29 @@ fun AppNavHost(
         }
 
         composable(
-            route = "chat_detail/{matchId}/{userId}/{firstName}/{lastName}",
+            route = "chat_detail/{matchId}/{userId}/{firstName}/{lastName}/{avatar}",
             arguments = listOf(
                 navArgument("matchId") { type = NavType.StringType },
                 navArgument("userId") { type = NavType.StringType },
                 navArgument("firstName") { type = NavType.StringType },
-                navArgument("lastName") { type = NavType.StringType }
+                navArgument("lastName") { type = NavType.StringType },
+                navArgument("avatar") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
-            val firstName = backStackEntry.arguments?.getString("firstName") ?: "User"
-            val lastName = backStackEntry.arguments?.getString("lastName") ?: ""
+            val firstName = URLDecoder.decode(backStackEntry.arguments?.getString("firstName") ?: "", "UTF-8")
+            val lastName = URLDecoder.decode(backStackEntry.arguments?.getString("lastName") ?: "", "UTF-8")
+            val avatar = URLDecoder.decode(backStackEntry.arguments?.getString("avatar") ?: "", "UTF-8")
 
-            // יצירת אובייקט חדש במקום המרה מJSON
             val chatPartner = UserResponse(
                 _id = userId,
                 firstName = firstName,
                 lastName = lastName,
                 email = "",
-                avatar = ""
+                avatar = avatar
             )
 
-            // המשך כרגיל
             ChatDetailScreen(
                 matchId = matchId,
                 chatPartner = chatPartner,

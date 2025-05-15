@@ -1,11 +1,6 @@
 package com.example.myapplication.ui.chat
 
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,44 +11,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.data.model.Message
 import com.example.myapplication.data.model.UserResponse
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
-
-// צבעים
-val Purple = Color(0xFF6200EE)
-val White = Color.White
-val Black = Color.Black
-val Gray = Color.Gray
-val Green = Color(0xFF4CAF50)
-val Blue = Color(0xFF2196F3)
-val Amber = Color(0xFFFFC107)
-val LightGray = Color(0xFFE0E0E0)
-val LightGrayBackground = Color(0xFFF0F0F0)
-val LightBackground = Color(0xFFF5F5F5)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,450 +44,382 @@ fun ChatDetailScreen(
     chatPartner: UserResponse,
     onBackClick: () -> Unit,
     sessionManager: SessionManager,
-    viewModel: ChatViewModel = viewModel()
+    viewModel: ChatViewModel
 ) {
-    val currentUserId = sessionManager.getUserId() ?: "unknown"
-    val messages by viewModel.messages.collectAsState(initial = emptyList())
-    val isOtherUserTyping by viewModel.isOtherUserTyping.collectAsState(initial = false)
-    val isLoading by viewModel.isLoading.collectAsState(initial = false)
-    val activeChat by viewModel.activeChat.collectAsState(initial = null)
+    val chatDetailState by viewModel.chatDetailState.collectAsStateWithLifecycle()
+    val currentUserId = sessionManager.getUserId() ?: ""
 
+    var messageText by remember { mutableStateOf("") }
+    var isTyping by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
-    // Add log to track activeChat state changes
-    LaunchedEffect(activeChat) {
-        Log.e("ChatDetailScreen", "Active chat state changed: ${activeChat?.matchId ?: "null"}")
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Load chat when screen is opened
+    LaunchedEffect(matchId) {
+        Log.d("ChatDetail", "Loading chat with matchId: '$matchId'")
+        viewModel.loadChat(matchId)
     }
 
-    // Load chat when screen is displayed
-    LaunchedEffect(key1 = matchId) {
-        Log.e("ChatDetailScreen", "Loading chat for matchId: $matchId")
-        viewModel.ensureSocketConnected()
-        viewModel.loadChatByMatchId(matchId, chatPartner)
-    }
+    // Mark messages as read when chat is loaded AND when new messages arrive
+    LaunchedEffect(chatDetailState.chat) {
+        chatDetailState.chat?.let { chat ->
+            Log.d("ChatDetail", "Chat loaded, marking messages as read")
+            Log.d("ChatDetail", "Chat ID: ${chat.id}")
+            Log.d("ChatDetail", "Current user: $currentUserId")
+            Log.d("ChatDetail", "Match ID: $matchId")
+            Log.d("ChatDetail", "Unread messages count: ${chat.messages.count { !it.read && it.sender != currentUserId }}")
 
-    // Better cleanup when leaving screen
-    DisposableEffect(key1 = Unit) {
-        onDispose {
-            Log.e("ChatDetailScreen", "DisposableEffect cleaning up. Current matchId: $matchId")
-            viewModel.clearActiveChat(fullClear = false)
+            // Only mark as read if there are unread messages from other users
+            val hasUnreadMessages = chat.messages.any { !it.read && it.sender != currentUserId }
+            if (hasUnreadMessages) {
+                viewModel.markMessagesAsRead(chat.id, currentUserId, matchId)
+            }
         }
     }
+
     // Scroll to bottom when new messages arrive
-    LaunchedEffect(key1 = messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    LaunchedEffect(chatDetailState.chat?.messages?.size) {
+        val messageCount = chatDetailState.chat?.messages?.size ?: 0
+        Log.d("ChatDetail", "Message count changed: $messageCount")
+        if (messageCount > 0) {
+            delay(100) // Small delay to ensure UI is updated
+            listState.animateScrollToItem(messageCount - 1)
         }
     }
 
-    // AI Tips dialog state
-    var showAITips by remember { mutableStateOf(false) }
-    var tipContent by remember { mutableStateOf(getRandomTips()) }
+    // Handle typing indicators
+    LaunchedEffect(messageText) {
+        if (messageText.isNotEmpty() && !isTyping) {
+            isTyping = true
+            viewModel.startTyping(matchId, currentUserId)
+        } else if (messageText.isEmpty() && isTyping) {
+            isTyping = false
+            viewModel.stopTyping(matchId, currentUserId)
+        }
+    }
+
+    // Clear current chat when leaving
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearCurrentChat()
+            if (isTyping) {
+                viewModel.stopTyping(matchId, currentUserId)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
-            ChatHeader(
-                partner = chatPartner,
-                isOnline = true,
-                onBackClick = onBackClick,
-                onAITipsClick = {
-                    showAITips = !showAITips
-                    if (showAITips) {
-                        tipContent = getRandomTips()
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Avatar with image support
+                        if (chatPartner.avatar.isNotEmpty()) {
+                            Log.d("ChatDetail", "Loading avatar: ${chatPartner.avatar}")
+                            AsyncImage(
+                                model = chatPartner.avatar,
+                                contentDescription = "Profile picture",
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Log.d("ChatDetail", "No avatar URL provided")
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "${chatPartner.firstName} ${chatPartner.lastName}".trim()
+                                    .ifEmpty { "Chat Partner" },
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (chatDetailState.typingUsers.isNotEmpty()) {
+                                Text(
+                                    text = "Typing...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
-                }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
         },
         bottomBar = {
-            MessageInput(
-                onSendMessage = { message ->
-                    viewModel.sendMessage(message)
-                },
-                onTypingChanged = { isTyping ->
-                    viewModel.onTypingChanged(isTyping)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    OutlinedTextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = {
+                            Text(
+                                text = "Type a message...",
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                if (messageText.trim().isNotEmpty()) {
+                                    viewModel.sendMessage(
+                                        matchId = matchId,
+                                        sender = currentUserId,
+                                        recipient = chatPartner._id,
+                                        content = messageText.trim()
+                                    )
+                                    messageText = ""
+                                    keyboardController?.hide()
+                                }
+                            }
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        ),
+                        maxLines = 5
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    FloatingActionButton(
+                        onClick = {
+                            if (messageText.trim().isNotEmpty() && !chatDetailState.isSending) {
+                                viewModel.sendMessage(
+                                    matchId = matchId,
+                                    sender = currentUserId,
+                                    recipient = chatPartner._id,
+                                    content = messageText.trim()
+                                )
+                                messageText = ""
+                                keyboardController?.hide()
+                            }
+                        },
+                        modifier = Modifier.size(48.dp),
+                        containerColor = if (messageText.trim().isNotEmpty() && !chatDetailState.isSending)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        contentColor = if (messageText.trim().isNotEmpty() && !chatDetailState.isSending)
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.outline
+                    ) {
+                        if (chatDetailState.isSending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send message"
+                            )
+                        }
+                    }
                 }
-            )
-        },
-        containerColor = LightBackground
-    ) { innerPadding ->
-        // Messages list
-        Box(
+            }
+        }
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(paddingValues)
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp),
-                contentPadding = PaddingValues(bottom = 8.dp)
-            ) {
-                items(messages) { message ->
-                    MessageItem(
-                        message = message,
-                        isFromCurrentUser = message.sender == currentUserId,
-                        partnerAvatarUrl = chatPartner.avatar
+            // Error handling
+            chatDetailState.error?.let { error ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
                     )
                 }
             }
 
-            // Typing indicator
-            AnimatedVisibility(
-                visible = isOtherUserTyping,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 4.dp),
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                Text(
-                    text = "Typing...",
-                    color = Gray,
-                    fontSize = 12.sp,
-                    fontStyle = FontStyle.Italic
-                )
-            }
+            when {
+                chatDetailState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
-            // Loading indicator
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .align(Alignment.Center)
-                )
+                chatDetailState.chat?.messages?.isEmpty() == true -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "💬",
+                                fontSize = 48.sp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Start the conversation!",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            items = chatDetailState.chat?.messages ?: emptyList(),
+                            key = { "${it.sender}-${it.timestamp.time}-${it.content}" }
+                        ) { message ->
+                            MessageBubble(
+                                message = message,
+                                isCurrentUser = message.sender == currentUserId,
+                                viewModel = viewModel
+                            )
+                        }
+                    }
+                }
             }
         }
     }
-
-    // AI Tips dialog
-    if (showAITips) {
-        AlertDialog(
-            onDismissRequest = { showAITips = false },
-            title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Conversation Tips 💡",
-                        color = Purple,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = { showAITips = false }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-            },
-            text = {
-                Text(
-                    text = tipContent,
-                    fontSize = 16.sp
-                )
-            },
-            confirmButton = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Button(
-                        onClick = {
-                            tipContent = getRandomTips()
-                        },
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text("More Tips")
-                    }
-                }
-            },
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ChatHeader(
-    partner: UserResponse,
-    isOnline: Boolean,
-    onBackClick: () -> Unit,
-    onAITipsClick: () -> Unit
-) {
-    TopAppBar(
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Profile image
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(LightGray)
-                ) {
-                    AsyncImage(
-                        model = partner.avatar.ifEmpty { null },
-                        contentDescription = "Profile picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Name and status
-                Column(
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Text(
-                        text = "${partner.firstName} ${partner.lastName}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = if (isOnline) "Online" else "Offline",
-                        fontSize = 12.sp,
-                        color = if (isOnline) Green else Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-        },
-        actions = {
-            // AI Tips button
-            IconButton(onClick = onAITipsClick) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = "AI Tips",
-                    tint = Amber,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    )
 }
 
 @Composable
-fun MessageItem(
+private fun MessageBubble(
     message: Message,
-    isFromCurrentUser: Boolean,
-    partnerAvatarUrl: String
+    isCurrentUser: Boolean,
+    viewModel: ChatViewModel
 ) {
-    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val timeFormatted = viewModel.formatMessageTime(message.timestamp)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalAlignment = if (isFromCurrentUser) Alignment.End else Alignment.Start
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start
     ) {
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = if (isFromCurrentUser) Arrangement.End else Arrangement.Start,
-            modifier = Modifier.fillMaxWidth()
+        Card(
+            modifier = Modifier.widthIn(max = 280.dp),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isCurrentUser) 16.dp else 4.dp,
+                bottomEnd = if (isCurrentUser) 4.dp else 16.dp
+            ),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            // Profile image (only for received messages)
-            if (!isFromCurrentUser) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(LightGray)
-                        .padding(end = 8.dp)
-                ) {
-                    AsyncImage(
-                        model = partnerAvatarUrl.ifEmpty { null },
-                        contentDescription = "Profile picture",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
-
-            // Message bubble
-            Box(
-                modifier = Modifier
-                    .widthIn(max = 280.dp)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 12.dp,
-                            topEnd = 12.dp,
-                            bottomStart = if (isFromCurrentUser) 12.dp else 4.dp,
-                            bottomEnd = if (isFromCurrentUser) 4.dp else 12.dp
-                        )
-                    )
-                    .background(if (isFromCurrentUser) Purple else White)
-                    .padding(12.dp)
+            Column(
+                modifier = Modifier.padding(12.dp)
             ) {
                 Text(
                     text = message.content,
-                    color = if (isFromCurrentUser) White else Black
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isCurrentUser)
+                        MaterialTheme.colorScheme.onPrimary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
 
-        // Time and read status
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp),
-            horizontalArrangement = if (isFromCurrentUser) Arrangement.End else Arrangement.Start
-        ) {
-            Text(
-                text = timeFormat.format(message.timestamp),
-                fontSize = 10.sp,
-                color = Gray,
-                modifier = Modifier.padding(
-                    start = if (isFromCurrentUser) 0.dp else 40.dp,
-                    end = 4.dp
-                )
-            )
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Read status (only for sent messages)
-            if (isFromCurrentUser) {
-                Icon(
-                    imageVector = if (message.read) Icons.Default.Done else Icons.Default.Schedule,
-                    contentDescription = if (message.read) "Read" else "Sent",
-                    tint = if (message.read) Blue else Gray,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = timeFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isCurrentUser)
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MessageInput(
-    onSendMessage: (String) -> Unit,
-    onTypingChanged: (Boolean) -> Unit
-) {
-    var messageText by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    // Handle typing indicator with debounce
-    val isTyping = remember { mutableStateOf(false) }
-
-    LaunchedEffect(messageText) {
-        isTyping.value = messageText.isNotEmpty()
-        onTypingChanged(isTyping.value)
-
-        if (messageText.isEmpty()) {
-            onTypingChanged(false)
-        }
-    }
-
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Message input field
-            OutlinedTextField(
-                value = messageText,
-                onValueChange = { messageText = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp, max = 120.dp)
-                    .onFocusChanged { state ->
-                        if (!state.isFocused && isTyping.value) {
-                            onTypingChanged(false)
-                            isTyping.value = false
-                        }
-                    },
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = LightGrayBackground,
-                    focusedContainerColor = LightGrayBackground,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = Color.Transparent
-                ),
-                shape = RoundedCornerShape(24.dp),
-                placeholder = { Text("Message") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Send
-                ),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        if (messageText.isNotEmpty()) {
-                            onSendMessage(messageText)
-                            messageText = ""
-                            keyboardController?.hide()
-                            focusManager.clearFocus()
-                        }
+                    if (isCurrentUser) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (message.read) "✓✓" else "✓",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (message.read)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )
                     }
-                )
-            )
-
-            // Send button
-            Spacer(modifier = Modifier.width(8.dp))
-
-            FilledIconButton(
-                onClick = {
-                    if (messageText.isNotEmpty()) {
-                        onSendMessage(messageText)
-                        messageText = ""
-                        keyboardController?.hide()
-                        focusManager.clearFocus()
-                    }
-                },
-                modifier = Modifier.size(48.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Purple
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Send",
-                    tint = White
-                )
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
     }
-}
-
-// Helper function for AI tips
-private fun getRandomTips(): String {
-    val tips = listOf(
-        "Ask open-ended questions to keep the conversation flowing.",
-        "Share something interesting about your day to create a connection.",
-        "Find common interests by asking about hobbies and passions.",
-        "Use humor to lighten the mood - a good laugh can break the ice.",
-        "Show genuine interest by following up on details they share.",
-        "Share a funny story about yourself to show vulnerability.",
-        "Ask about their weekend plans or a recent adventure.",
-        "Discuss favorite movies, books, or TV shows to find common ground.",
-        "Share a unique experience or travel story to stand out.",
-        "Ask what they're passionate about - people love talking about their interests."
-    )
-
-    val randomTips = tips.shuffled().take(4)
-    val tipsText = StringBuilder("Here are some conversation starters:\n\n")
-
-    randomTips.forEach { tip ->
-        tipsText.append("• $tip\n\n")
-    }
-
-    return tipsText.toString().trim()
 }

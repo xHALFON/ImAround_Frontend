@@ -39,6 +39,7 @@ import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.ui.chat.ChatViewModel
 import com.example.myapplication.ui.chat.compose.ChatListScreen
 import com.google.gson.Gson
+import java.net.URLEncoder
 
 
 sealed class BottomNavItem(val route: String, val icon: Any, val label: String) {
@@ -193,7 +194,8 @@ fun MainScreen(navController: NavHostController) {
                         val userId = chatPartner._id ?: ""
                         val firstName = chatPartner.firstName ?: "User"
                         val lastName = chatPartner.lastName ?: ""
-                        navController.navigate("chat_detail/$safeMatchId/$userId/$firstName/$lastName")
+                        val avatar = URLEncoder.encode(chatPartner.avatar ?: "", "UTF-8")
+                        navController.navigate("chat_detail/$safeMatchId/$userId/$firstName/$lastName/$avatar")
                     },
                     sessionManager = sessionManager,
                     viewModel = chatViewModel,

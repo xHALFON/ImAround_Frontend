@@ -1,438 +1,350 @@
 package com.example.myapplication.ui.chat
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.myapplication.data.local.SessionManager
-import com.example.myapplication.data.model.Chat
-import com.example.myapplication.data.model.Message
-import com.example.myapplication.data.model.UserResponse
+import com.example.myapplication.data.model.*
 import com.example.myapplication.data.repository.ChatRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.Date
 
-class ChatViewModel(application: Application) : AndroidViewModel(application) {
-    private val TAG = "ChatViewModel"
-    private val chatRepository = ChatRepository()
-    private val sessionManager = SessionManager(application)
+class ChatViewModel : ViewModel() {
+    private val repository = ChatRepository.getInstance()
 
-    // Current user ID
-    val currentUserId: String
-        get() = sessionManager.getUserId() ?: "unknown"
+    companion object {
+        private const val TAG = "ChatViewModel"
+        private const val TYPING_TIMEOUT_MS = 3000L
+    }
 
-    // Active chat
-    private val _activeChat = MutableStateFlow<Chat?>(null)
-    val activeChat: StateFlow<Chat?> = _activeChat
+    // UI State
+    data class ChatListState(
+        val chats: List<Chat> = emptyList(),
+        val isLoading: Boolean = false,
+        val error: String? = null,
+        val isRefreshing: Boolean = false
+    )
 
-    // All user chats
-    private val _userChats = MutableStateFlow<List<Chat>>(emptyList())
-    val userChats: StateFlow<List<Chat>> = _userChats
+    data class ChatDetailState(
+        val chat: Chat? = null,
+        val isLoading: Boolean = false,
+        val error: String? = null,
+        val isTyping: Boolean = false,
+        val typingUsers: Set<String> = emptySet(),
+        val isSending: Boolean = false
+    )
 
-    // Typing indicator state
-    private val _isOtherUserTyping = MutableStateFlow(false)
-    val isOtherUserTyping: StateFlow<Boolean> = _isOtherUserTyping
+    // State flows
+    private val _chatListState = MutableStateFlow(ChatListState())
+    val chatListState: StateFlow<ChatListState> = _chatListState.asStateFlow()
 
-    // Chat partner info
-    private val _chatPartner = MutableStateFlow<UserResponse?>(null)
-    val chatPartner: StateFlow<UserResponse?> = _chatPartner
+    private val _chatDetailState = MutableStateFlow(ChatDetailState())
+    val chatDetailState: StateFlow<ChatDetailState> = _chatDetailState.asStateFlow()
 
-    // Messages for current chat
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages: StateFlow<List<Message>> = _messages
-
-    // Error messages
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
-
-    // Loading state
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
-
-    // Typing indicator job
+    // Typing job for debouncing
     private var typingJob: Job? = null
 
-    // Active chat tracking
-    private var _lastViewedMatchId: String? = null
-    private var _lastViewedPartner: UserResponse? = null
-    private var _isActiveScreenVisible = false
-
     init {
-        setupSocketListeners()
-        loadUserChats()
+        Log.d(TAG, "ChatViewModel initialized, starting to observe repository events")
+        observeRepositoryEvents()
     }
 
-    private fun setupSocketListeners() {
-        chatRepository.setupMessageListeners(
-            onMessageReceived = { messageResponse ->
-                val matchId = messageResponse.matchId
-                val message = messageResponse.message
+    private fun observeRepositoryEvents() {
+        Log.d(TAG, "Setting up repository event observers")
 
-                Log.d(TAG, "⚡ Message received: ${message.content} for matchId: $matchId, current active matchId: $_lastViewedMatchId, isActive: $_isActiveScreenVisible")
-
-                // בדיקה משופרת עבור עדכון הודעות
-                viewModelScope.launch {
-                    if (matchId == _lastViewedMatchId && _isActiveScreenVisible) {
-                        // אנחנו נמצאים במסך הצ'אט הנכון - עדכן את המסך
-                        Log.d(TAG, "✅ Updating active chat with new message")
-                        updateChatMessages(matchId, message)
-                    }
-
-                    // תמיד עדכן את רשימת הצ'אטים (גם אם אנחנו במסך אחר)
-                    updateChatInList(matchId, message)
-                }
-            },
-            onMessageSent = { messageResponse ->
-                val matchId = messageResponse.matchId
-                val message = messageResponse.message
-
-                Log.d(TAG, "Message sent confirmation for matchId: $matchId")
-
-                viewModelScope.launch {
-                    if (matchId == _lastViewedMatchId && _isActiveScreenVisible) {
-                        // Find the temporary message and replace it
-                        val updatedMessages = _messages.value.map { existingMsg ->
-                            if (existingMsg.content == message.content && existingMsg.sender == message.sender) {
-                                message
-                            } else {
-                                existingMsg
-                            }
-                        }
-
-                        _messages.value = updatedMessages
-
-                        // Update the chat too
-                        _activeChat.value?.let { chat ->
-                            _activeChat.value = chat.copy(
-                                messages = updatedMessages,
-                                lastActivity = message.timestamp
-                            )
-                        }
-                    }
-
-                    // Update chat list
-                    updateChatInList(matchId, message)
-                }
-            },
-            onTypingIndicator = { response ->
-                if (_activeChat.value?.matchId == response.matchId &&
-                    response.userId != currentUserId &&
-                    _isActiveScreenVisible) {
-                    _isOtherUserTyping.value = response.isTyping
-                    Log.d(TAG, "Typing indicator from ${response.userId}: ${response.isTyping}")
-                }
-            },
-            onMessageError = { errorMsg ->
-                _errorMessage.value = errorMsg
-                Log.e(TAG, "Message error: $errorMsg")
-            },
-            onMessagesRead = { response ->
-                val matchId = response.matchId
-
-                viewModelScope.launch {
-                    if (matchId == _lastViewedMatchId && _isActiveScreenVisible) {
-                        val updatedMessages = _messages.value.map { message ->
-                            if (message.sender == currentUserId && !message.read) {
-                                message.copy(read = true)
-                            } else {
-                                message
-                            }
-                        }
-
-                        _messages.value = updatedMessages
-
-                        _activeChat.value?.let { chat ->
-                            _activeChat.value = chat.copy(
-                                messages = updatedMessages
-                            )
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-    // פונקציה משופרת לעדכון הודעות במסך צ'אט פעיל
-    private fun updateChatMessages(matchId: String, newMessage: Message) {
+        // Observe chats list
         viewModelScope.launch {
-            try {
-                Log.d(TAG, "⚡ Updating chat messages for matchId: $matchId")
+            repository.chats.collect { chats ->
+                _chatListState.value = _chatListState.value.copy(
+                    chats = chats,
+                    isLoading = false
+                )
+            }
+        }
 
-                // עזרה עדכון ה-messages ישירות
-                val updatedMessages = _messages.value.toMutableList()
+        // Observe current chat
+        viewModelScope.launch {
+            repository.currentChat.collect { chat ->
+                _chatDetailState.value = _chatDetailState.value.copy(
+                    chat = chat,
+                    isLoading = false
+                )
+            }
+        }
 
-                // וודא שההודעה לא כבר קיימת (למניעת כפילויות)
-                if (!updatedMessages.any { it.content == newMessage.content && it.timestamp == newMessage.timestamp }) {
-                    updatedMessages.add(newMessage)
+        // Observe new messages
+        viewModelScope.launch {
+            repository.newMessage.collect { messageResponse ->
+                Log.d(TAG, "Received new message in ViewModel")
+                // Update UI state if needed
+            }
+        }
 
-                    // עדכון גלובלי
-                    Log.d(TAG, "📝 Setting new messages list, size: ${updatedMessages.size}")
-                    _messages.value = updatedMessages
+        // Observe message sent confirmations
+        viewModelScope.launch {
+            Log.d(TAG, "Setting up messageSent observer")
+            repository.messageSent.collect { messageResponse ->
+                Log.d(TAG, "=== MESSAGE SENT IN VIEWMODEL ===")
+                Log.d(TAG, "Message sent confirmation received: ${messageResponse.message.content}")
+                Log.d(TAG, "Current isSending state: ${_chatDetailState.value.isSending}")
+                Log.d(TAG, "Setting isSending = false")
+                _chatDetailState.value = _chatDetailState.value.copy(isSending = false)
+                Log.d(TAG, "New isSending state: ${_chatDetailState.value.isSending}")
+            }
+        }
 
-                    // גם עדכן את ה-activeChat כדי לשמור על סנכרון
-                    _activeChat.value?.let { chat ->
-                        val updatedChat = chat.copy(
-                            messages = updatedMessages,
-                            lastActivity = newMessage.timestamp
-                        )
-                        _activeChat.value = updatedChat
-                    }
+        // Observe typing indicators
+        viewModelScope.launch {
+            repository.typingIndicator.collect { typingIndicator ->
+                updateTypingIndicator(typingIndicator)
+            }
+        }
 
-                    // אילוץ רענון בנוסף
-                    delay(50)
-                    forceRefreshMessages(updatedMessages)
+        // Observe messages read events
+        viewModelScope.launch {
+            Log.d(TAG, "Setting up messagesRead observer")
+            repository.messagesRead.collect { messagesRead ->
+                Log.d(TAG, "=== MESSAGES READ EVENT IN VIEWMODEL ===")
+                Log.d(TAG, "Match ID: ${messagesRead.matchId}")
+                Log.d(TAG, "Read by: ${messagesRead.readBy}")
+                Log.d(TAG, "Messages read by: ${messagesRead.readBy}")
+            }
+        }
 
-                    Log.d(TAG, "✅ Messages updated successfully with new message")
-                } else {
-                    Log.d(TAG, "⚠️ Message already exists, skipping update")
-                }
-
-                // סמן הודעות שהתקבלו כנקראות
-                if (newMessage.sender != currentUserId) {
-                    markMessagesAsRead()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error updating chat messages", e)
+        // Observe message errors
+        viewModelScope.launch {
+            repository.messageError.collect { error ->
+                Log.d(TAG, "Message error received: $error")
+                _chatDetailState.value = _chatDetailState.value.copy(
+                    error = error,
+                    isSending = false
+                )
             }
         }
     }
 
-    // פונקציה לאילוץ רענון ההודעות
-    fun forceRefreshMessages(messages: List<Message>) {
+    // Chat List Methods
+    fun loadUserChats(userId: String) {
         viewModelScope.launch {
-            try {
-                // טכניקה משופרת לאילוץ רה-קומפוזיציה
-                _messages.value = emptyList()
-                delay(20)
-                _messages.value = messages
-                Log.d(TAG, "🔄 Force refreshed messages, count: ${messages.size}")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error during force refresh", e)
-            }
-        }
-    }
+            _chatListState.value = _chatListState.value.copy(isLoading = true, error = null)
 
-    // Load all chats for current user
-    fun loadUserChats() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val chats = chatRepository.getUserChats(currentUserId)
-                _userChats.value = chats.sortedByDescending { it.lastActivity }
-                Log.d(TAG, "Loaded ${chats.size} chats")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading user chats", e)
-                _errorMessage.value = "Failed to load chats: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    // Load a specific chat by match ID
-    fun loadChatByMatchId(matchId: String, chatPartner: UserResponse) {
-        // שמירת מידע אודות הצ'אט הפעיל
-        _lastViewedMatchId = matchId
-        _lastViewedPartner = chatPartner
-        _isActiveScreenVisible = true
-
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val chat = chatRepository.getChatByMatchId(matchId)
-
-                if (chat != null) {
-                    Log.d(TAG, "Loaded chat with ${chat.messages.size} messages")
-                    _activeChat.value = chat
-                    _messages.value = chat.messages
-                    _chatPartner.value = chatPartner
-
-                    // Mark messages as read
-                    if (chat.messages.any { !it.read && it.sender != currentUserId }) {
-                        markMessagesAsRead()
-                    }
-                } else {
-                    // Create an empty chat if none exists
-                    Log.d(TAG, "Creating new empty chat for matchId: $matchId")
-                    _activeChat.value = Chat(
-                        id = "",
-                        matchId = matchId,
-                        participants = listOf(currentUserId, chatPartner._id),
-                        messages = emptyList(),
-                        lastActivity = Date(),
-                        createdAt = Date()
+            repository.getUserChats(userId)
+                .onSuccess { chats ->
+                    _chatListState.value = _chatListState.value.copy(
+                        chats = chats,
+                        isLoading = false,
+                        error = null
                     )
-                    _messages.value = emptyList()
-                    _chatPartner.value = chatPartner
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading chat", e)
-                _errorMessage.value = "Failed to load chat: ${e.message}"
-            } finally {
-                _isLoading.value = false
-            }
+                .onFailure { exception ->
+                    _chatListState.value = _chatListState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Unknown error occurred"
+                    )
+                }
         }
     }
 
-    // Send a message
-    fun sendMessage(content: String) {
-        val activeChat = _activeChat.value ?: return
-        val chatPartner = _chatPartner.value ?: return
-
-        // Create a temporary message
-        val tempMessage = Message(
-            sender = currentUserId,
-            content = content,
-            timestamp = Date(),
-            read = false
-        )
-
-        // Add to UI immediately
+    fun refreshChats(userId: String) {
         viewModelScope.launch {
-            val currentMessages = _messages.value.toMutableList()
-            currentMessages.add(tempMessage)
-            _messages.value = currentMessages
+            _chatListState.value = _chatListState.value.copy(isRefreshing = true)
 
-            Log.d(TAG, "Added temporary message to UI: $content")
+            repository.getUserChats(userId)
+                .onSuccess { chats ->
+                    _chatListState.value = _chatListState.value.copy(
+                        chats = chats,
+                        isRefreshing = false,
+                        error = null
+                    )
+                }
+                .onFailure { exception ->
+                    _chatListState.value = _chatListState.value.copy(
+                        isRefreshing = false,
+                        error = exception.message ?: "Unknown error occurred"
+                    )
+                }
         }
-
-        // Send via socket
-        chatRepository.sendMessage(
-            matchId = activeChat.matchId,
-            senderId = currentUserId,
-            recipientId = chatPartner._id,
-            content = content
-        )
     }
 
-    // Handle typing indicator
-    fun onTypingChanged(isTyping: Boolean) {
-        val activeChat = _activeChat.value ?: return
+    // Chat Detail Methods
+    fun loadChat(matchId: String) {
+        viewModelScope.launch {
+            _chatDetailState.value = _chatDetailState.value.copy(isLoading = true, error = null)
 
-        if (isTyping) {
-            // Cancel previous job if exists
-            typingJob?.cancel()
+            repository.getChatByMatchId(matchId)
+                .onSuccess { chat ->
+                    _chatDetailState.value = _chatDetailState.value.copy(
+                        chat = chat,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+                .onFailure { exception ->
+                    _chatDetailState.value = _chatDetailState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Failed to load chat"
+                    )
+                }
+        }
+    }
 
-            // Send typing indicator
-            chatRepository.sendTypingIndicator(activeChat.matchId, currentUserId, true)
+    fun sendMessage(matchId: String, sender: String, recipient: String, content: String) {
+        if (content.trim().isEmpty()) return
 
-            // Schedule to stop after a delay
-            typingJob = viewModelScope.launch {
-                delay(3000) // Stop typing after 3 seconds of inactivity
-                chatRepository.sendTypingIndicator(activeChat.matchId, currentUserId, false)
+        Log.d(TAG, "=== SENDING MESSAGE ===")
+        Log.d(TAG, "Content: $content")
+        Log.d(TAG, "Setting isSending = true")
+
+        viewModelScope.launch {
+            _chatDetailState.value = _chatDetailState.value.copy(isSending = true)
+            repository.sendMessage(matchId, sender, recipient, content)
+
+            // Stop typing indicator when sending message
+            stopTyping(matchId, sender)
+
+            // Add timeout to reset isSending state if no confirmation received
+            delay(3000) // 3 seconds timeout
+            if (_chatDetailState.value.isSending) {
+                Log.d(TAG, "Message send timeout - resetting isSending to false")
+                _chatDetailState.value = _chatDetailState.value.copy(isSending = false)
             }
+        }
+    }
+
+    fun markMessagesAsRead(chatId: String, userId: String, matchId: String) {
+        viewModelScope.launch {
+            Log.d(TAG, "=== MARKING MESSAGES AS READ ===")
+            Log.d(TAG, "Chat ID: $chatId")
+            Log.d(TAG, "User ID: $userId")
+            Log.d(TAG, "Match ID: $matchId")
+
+            // Only mark via socket - remove API call to avoid race condition
+            repository.markMessagesAsReadSocket(chatId, userId, matchId)
+            Log.d(TAG, "Sent mark as read via socket only")
+        }
+    }
+
+    // Typing Methods
+    fun startTyping(matchId: String, userId: String) {
+        repository.sendTypingIndicator(matchId, userId, true)
+        _chatDetailState.value = _chatDetailState.value.copy(isTyping = true)
+
+        // Cancel previous typing job and start a new one
+        typingJob?.cancel()
+        typingJob = viewModelScope.launch {
+            delay(TYPING_TIMEOUT_MS)
+            stopTyping(matchId, userId)
+        }
+    }
+
+    fun stopTyping(matchId: String, userId: String) {
+        typingJob?.cancel()
+        repository.sendTypingIndicator(matchId, userId, false)
+        _chatDetailState.value = _chatDetailState.value.copy(isTyping = false)
+    }
+
+    private fun updateTypingIndicator(typingIndicator: TypingIndicatorResponse) {
+        val currentTypingUsers = _chatDetailState.value.typingUsers.toMutableSet()
+
+        if (typingIndicator.isTyping) {
+            currentTypingUsers.add(typingIndicator.userId)
         } else {
-            // Cancel previous job if exists
-            typingJob?.cancel()
+            currentTypingUsers.remove(typingIndicator.userId)
+        }
 
-            // Send stop typing
-            chatRepository.sendTypingIndicator(activeChat.matchId, currentUserId, false)
+        _chatDetailState.value = _chatDetailState.value.copy(
+            typingUsers = currentTypingUsers
+        )
+    }
+
+    // Socket Methods
+    fun connectSocket(userId: String) {
+        repository.connectSocket(userId)
+    }
+
+    fun disconnectSocket() {
+        repository.disconnectSocket()
+    }
+
+    fun isSocketConnected(): Boolean {
+        return repository.isSocketConnected()
+    }
+
+    // Helper Methods
+    fun clearError() {
+        _chatDetailState.value = _chatDetailState.value.copy(error = null)
+        _chatListState.value = _chatListState.value.copy(error = null)
+    }
+
+    fun clearCurrentChat() {
+        repository.clearCurrentChat()
+        _chatDetailState.value = ChatDetailState()
+    }
+
+    // Get unread message count for a chat
+    fun getUnreadMessageCount(chat: Chat, currentUserId: String): Int {
+        return chat.messages.count { message ->
+            message.sender != currentUserId && !message.read
         }
     }
 
-    // Mark messages as read
-    fun markMessagesAsRead() {
-        val activeChat = _activeChat.value ?: return
+    // Get the other participant in a chat
+    fun getOtherParticipant(chat: Chat, currentUserId: String): String? {
+        return chat.participants.find { it != currentUserId }
+    }
 
-        viewModelScope.launch {
-            try {
-                chatRepository.markMessagesAsRead(activeChat.id, currentUserId, activeChat.matchId)
+    // Cache for user details to avoid repeated API calls
+    private val userCache = mutableMapOf<String, UserResponse>()
 
-                val updatedMessages = _messages.value.map { message ->
-                    if (message.sender != currentUserId && !message.read) {
-                        message.copy(read = true)
-                    } else {
-                        message
-                    }
-                }
-                _messages.value = updatedMessages
-
-                _activeChat.value?.let { chat ->
-                    val updatedChat = chat.copy(
-                        messages = updatedMessages
-                    )
-                    _activeChat.value = updatedChat
-                }
-
-                Log.d(TAG, "Marked messages as read")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error marking messages as read", e)
+    suspend fun getUserDetails(userId: String): UserResponse? {
+        return try {
+            // Check cache first
+            userCache[userId]?.let {
+                Log.d(TAG, "Using cached user details for $userId")
+                return it
             }
-        }
-    }
 
-    // וודא שהסוקט מחובר
-    fun ensureSocketConnected() {
-        viewModelScope.launch {
-            if (!chatRepository.isSocketConnected()) {
-                Log.d(TAG, "Connecting socket...")
-                chatRepository.connectSocket(currentUserId)
-                delay(300) // המתן רגע קטן אחרי החיבור
-            } else {
-                Log.d(TAG, "Socket already connected")
-            }
-        }
-    }
-
-    // Clear active chat when leaving the chat screen
-    fun clearActiveChat(fullClear: Boolean = true) {
-        if (fullClear) {
-            _lastViewedMatchId = null
-            _lastViewedPartner = null
-        }
-
-        // תמיד סמן שעזבנו את המסך
-        _isActiveScreenVisible = false
-
-        // נקה את שאר מצבי הצ'אט
-        if (fullClear) {
-            _activeChat.value = null
-            _messages.value = emptyList()
-            _chatPartner.value = null
-        }
-
-        _isOtherUserTyping.value = false
-
-        Log.d(TAG, "Cleared active chat (fullClear=$fullClear)")
-    }
-
-    // Update chat in the list
-    private fun updateChatInList(matchId: String, newMessage: Message) {
-        viewModelScope.launch {
-            try {
-                val chats = _userChats.value.toMutableList()
-                val chatIndex = chats.indexOfFirst { it.matchId == matchId }
-
-                if (chatIndex >= 0) {
-                    // Update existing chat
-                    val chat = chats[chatIndex]
-
-                    // בדוק שההודעה לא כבר קיימת
-                    if (!chat.messages.any { it.content == newMessage.content && it.timestamp == newMessage.timestamp }) {
-                        val updatedChat = chat.copy(
-                            messages = chat.messages + newMessage,
-                            lastActivity = newMessage.timestamp
-                        )
-                        chats[chatIndex] = updatedChat
-
-                        // Sort chats by last activity
-                        chats.sortByDescending { it.lastActivity }
-                        _userChats.value = chats
-
-                        Log.d(TAG, "Updated chat in list: $matchId")
-                    }
-                } else {
-                    // Reload all chats if the chat isn't in the list
-                    Log.d(TAG, "Chat not found in list, reloading all")
-                    loadUserChats()
+            // Fetch from API if not in cache
+            repository.getUserDetails(userId)
+                .onSuccess { userDetails ->
+                    userCache[userId] = userDetails
+                    Log.d(TAG, "Cached user details for $userId: ${userDetails.firstName} ${userDetails.lastName}")
+                    return userDetails
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating chat in list", e)
-            }
+                .onFailure { error ->
+                    Log.e(TAG, "Failed to fetch user details for $userId", error)
+                    return null
+                }
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching user details for $userId", e)
+            null
         }
+    }
+
+    // Get the last message text for chat list
+    fun getLastMessageText(chat: Chat): String {
+        return chat.messages.lastOrNull()?.content ?: "No messages yet"
+    }
+
+    // Format time for display
+    fun formatMessageTime(timestamp: java.util.Date): String {
+        val now = System.currentTimeMillis()
+        val messageTime = timestamp.time
+        val diff = now - messageTime
+
+        return when {
+            diff < 60000 -> "Just now" // Less than 1 minute
+            diff < 3600000 -> "${diff / 60000}m ago" // Less than 1 hour
+            diff < 86400000 -> "${diff / 3600000}h ago" // Less than 1 day
+            else -> "${diff / 86400000}d ago" // Days ago
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        typingJob?.cancel()
+        repository.disconnectSocket()
     }
 }

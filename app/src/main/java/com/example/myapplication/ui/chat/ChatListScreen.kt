@@ -8,7 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,44 +17,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.example.myapplication.R
 import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.data.model.Chat
 import com.example.myapplication.data.model.UserResponse
 import com.example.myapplication.ui.chat.ChatViewModel
-import java.text.SimpleDateFormat
-import java.util.*
-
-// צבעים
-val Purple = Color(0xFF6200EE)
-val White = Color.White
-val Black = Color.Black
-val Gray = Color.Gray
-val LightGray = Color(0xFFE0E0E0)
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    onChatSelected: (String, UserResponse) -> Unit,
+    onChatSelected: (String?, UserResponse) -> Unit,
     sessionManager: SessionManager,
-    viewModel: ChatViewModel = viewModel(),
+    viewModel: ChatViewModel,
     onBackClick: () -> Unit
 ) {
-    val chats by viewModel.userChats.collectAsState(initial = emptyList())
-    val isLoading by viewModel.isLoading.collectAsState(initial = false)
-    val currentUserId = sessionManager.getUserId() ?: "unknown"
+    val chatListState by viewModel.chatListState.collectAsStateWithLifecycle()
+    val currentUserId = sessionManager.getUserId() ?: ""
 
-    // Load chats when screen is displayed
-    LaunchedEffect(key1 = Unit) {
-        viewModel.loadUserChats()
+    // Connect to socket when screen is loaded
+    LaunchedEffect(currentUserId) {
+        if (currentUserId.isNotEmpty()) {
+            viewModel.connectSocket(currentUserId)
+            viewModel.loadUserChats(currentUserId)
+        }
     }
 
     Scaffold(
@@ -62,78 +55,187 @@ fun ChatListScreen(
                 title = {
                     Text(
                         text = "Messages",
-                        style = MaterialTheme.typography.titleLarge
+                        fontWeight = FontWeight.SemiBold
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
-    ) { innerPadding ->
-        // Content
-        Box(
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(paddingValues)
         ) {
-            if (chats.isEmpty() && !isLoading) {
-                // Empty state
-                Text(
-                    text = "No conversations yet.\nGo match with someone!",
+            // Error handling
+            chatListState.error?.let { error ->
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                        .wrapContentSize(Alignment.Center),
-                    textAlign = TextAlign.Center,
-                    color = Gray,
-                    fontSize = 18.sp
-                )
-            } else {
-                // Chat list
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 8.dp)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
                 ) {
-                    items(chats) { chat ->
-                        ChatItem(
-                            chat = chat,
-                            currentUserId = currentUserId,
-                            onClick = {
-                                // Get partner user ID
-                                val partnerId = chat.participants.find { it != currentUserId } ?: return@ChatItem
-
-                                // Create temporary user (you'd fetch this from your API in a real app)
-                                val partnerUser = UserResponse(
-                                    _id = partnerId,
-                                    firstName = "User", // Replace with actual data
-                                    lastName = partnerId.take(4), // Replace with actual data
-                                    email = "", // Replace with actual data
-                                    avatar = "" // Replace with actual data
-                                )
-
-                                onChatSelected(chat.matchId, partnerUser)
-                            }
-                        )
-                    }
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
             }
 
-            // Loading indicator
-            if (isLoading) {
-                CircularProgressIndicator(
+            SwipeRefresh(
+                state = rememberSwipeRefreshState(chatListState.isRefreshing),
+                onRefresh = { viewModel.refreshChats(currentUserId) },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when {
+                    chatListState.isLoading && chatListState.chats.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    chatListState.chats.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No conversations yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    text = "Start matching to begin chatting!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            items(
+                                items = chatListState.chats,
+                                key = { it.id }
+                            ) { chat ->
+                                ChatItemWithUserDetails(
+                                    chat = chat,
+                                    currentUserId = currentUserId,
+                                    viewModel = viewModel,
+                                    onClick = { chatPartner ->
+                                        onChatSelected(chat.matchId, chatPartner)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatItemWithUserDetails(
+    chat: Chat,
+    currentUserId: String,
+    viewModel: ChatViewModel,
+    onClick: (UserResponse) -> Unit
+) {
+    val otherUserId = viewModel.getOtherParticipant(chat, currentUserId)
+    var userDetails by remember { mutableStateOf<UserResponse?>(null) }
+
+    // Fetch user details
+    LaunchedEffect(otherUserId) {
+        otherUserId?.let { userId ->
+            userDetails = viewModel.getUserDetails(userId)
+        }
+    }
+
+    // Show loading or the actual chat item
+    userDetails?.let { user ->
+        ChatItem(
+            chat = chat,
+            currentUserId = currentUserId,
+            viewModel = viewModel,
+            chatPartner = user,
+            onClick = { onClick(user) }
+        )
+    } ?: run {
+        // Loading state
+        ChatItemSkeleton()
+    }
+}
+
+@Composable
+private fun ChatItemSkeleton() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar skeleton
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Text skeletons
+            Column(modifier = Modifier.weight(1f)) {
+                Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .align(Alignment.Center)
+                        .fillMaxWidth(0.4f)
+                        .height(16.dp)
+                        .background(
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            RoundedCornerShape(4.dp)
+                        )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(14.dp)
+                        .background(
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                            RoundedCornerShape(4.dp)
+                        )
                 )
             }
         }
@@ -141,154 +243,140 @@ fun ChatListScreen(
 }
 
 @Composable
-fun ChatItem(
+private fun ChatItem(
     chat: Chat,
     currentUserId: String,
+    viewModel: ChatViewModel,
+    chatPartner: UserResponse? = null,
     onClick: () -> Unit
 ) {
-    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val dateTimeFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
 
-    // Get partner user ID
-    val partnerId = chat.participants.find { it != currentUserId } ?: return
+    val unreadCount = viewModel.getUnreadMessageCount(chat, currentUserId)
+    val lastMessage = viewModel.getLastMessageText(chat)
+    val timeText = chat.messages.lastOrNull()?.let {
+        viewModel.formatMessageTime(it.timestamp)
+    } ?: ""
 
-    // Determine last message and time
-    val lastMessage = chat.messages.lastOrNull()
-    val lastMessageTime = lastMessage?.timestamp ?: chat.lastActivity
+    val displayName = chatPartner?.let {
+        "${it.firstName} ${it.lastName}".trim().ifEmpty { "Chat Partner" }
+    } ?: "Loading..."
 
-    // Format time
-    val formattedTime = when {
-        isSameDay(Calendar.getInstance(), lastMessageTime) ->
-            timeFormat.format(lastMessageTime)
-        isYesterday(Calendar.getInstance(), lastMessageTime) ->
-            "Yesterday"
-        else ->
-            dateTimeFormat.format(lastMessageTime)
-    }
-
-    // Count unread messages
-    val unreadCount = chat.messages.count { !it.read && it.sender != currentUserId }
-
-    Column {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (unreadCount > 0) 4.dp else 1.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (unreadCount > 0)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(12.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Profile image
-            AsyncImage(
-                model = "", // Replace with user avatar URL
-                contentDescription = "Profile picture",
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.iamaround_logo_new)
-            )
+            // Avatar
+            if (chatPartner?.avatar?.isNotEmpty() == true) {
+                AsyncImage(
+                    model = chatPartner.avatar, // זה ה-URL
+                    contentDescription = "Profile picture",
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Fallback icon
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
 
-            // Message info
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Chat content
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
+                modifier = Modifier.weight(1f)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Name
                     Text(
-                        text = "User ${partnerId.take(4)}", // Replace with actual user name
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = Black,
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Time
-                    Text(
-                        text = formattedTime,
-                        fontSize = 12.sp,
-                        color = Gray
-                    )
+                    if (timeText.isNotEmpty()) {
+                        Text(
+                            text = timeText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Last message
                     Text(
-                        text = when {
-                            lastMessage != null -> {
-                                if (lastMessage.sender == currentUserId) {
-                                    "You: ${lastMessage.content}"
-                                } else {
-                                    lastMessage.content
-                                }
-                            }
-                            else -> "Start a conversation"
-                        },
+                        text = lastMessage,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = if (unreadCount > 0) FontWeight.Medium else FontWeight.Normal
+                        ),
+                        color = if (unreadCount > 0)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.outline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = Gray,
-                        fontSize = 14.sp,
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Unread count
                     if (unreadCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(Purple),
-                            contentAlignment = Alignment.Center
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.primary
                         ) {
                             Text(
-                                text = if (unreadCount > 9) "9+" else unreadCount.toString(),
-                                color = White,
-                                fontSize = 12.sp
+                                text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
             }
         }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 72.dp),
-            color = LightGray
-        )
     }
-}
-
-// Helper functions
-private fun isSameDay(cal1: Calendar, date: Date): Boolean {
-    val cal2 = Calendar.getInstance().apply { time = date }
-    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-}
-
-private fun isYesterday(today: Calendar, date: Date): Boolean {
-    val yesterday = Calendar.getInstance().apply {
-        timeInMillis = today.timeInMillis
-        add(Calendar.DAY_OF_YEAR, -1)
-    }
-    val otherDay = Calendar.getInstance().apply { time = date }
-
-    return yesterday.get(Calendar.YEAR) == otherDay.get(Calendar.YEAR) &&
-            yesterday.get(Calendar.DAY_OF_YEAR) == otherDay.get(Calendar.DAY_OF_YEAR)
-}
-
-// Simple color fill placeholder
-class ColorFillPlaceholder(private val color: Color) : Any() {
-    // This is just a placeholder that works with coil
-    override fun toString(): String = "ColorFillPlaceholder(color=$color)"
 }
