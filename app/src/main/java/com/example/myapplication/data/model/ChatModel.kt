@@ -47,3 +47,6 @@ data class MessagesReadResponse(
     val matchId: String,
     val readBy: String
 )
+data class ChatTipsResponse(
+    val tips: List<String>
+)

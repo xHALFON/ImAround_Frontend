@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.*
+import com.example.myapplication.data.network.RetrofitClient
 import com.example.myapplication.data.repository.ChatRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -188,7 +189,38 @@ class ChatViewModel : ViewModel() {
                 }
         }
     }
+    private val _chatTips = MutableStateFlow<List<String>>(emptyList())
+    val chatTips = _chatTips.asStateFlow()
 
+    private val _isLoadingTips = MutableStateFlow(false)
+    val isLoadingTips = _isLoadingTips.asStateFlow()
+
+    private val _tipsError = MutableStateFlow<String?>(null)
+    val tipsError = _tipsError.asStateFlow()
+
+    // פונקציה לקבלת טיפי צ'אט
+    fun getChatTips(matchId: String) {
+        viewModelScope.launch {
+            _isLoadingTips.value = true
+            _tipsError.value = null
+
+            try {
+                val response = RetrofitClient.chatService.getChatTips(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    _chatTips.value = response.body()!!.tips
+                    Log.d("ChatViewModel", "Got ${response.body()!!.tips.size} tips")
+                } else {
+                    _tipsError.value = "Failed to get tips: ${response.message()}"
+                    Log.e("ChatViewModel", "Failed to get tips: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                _tipsError.value = "Error getting tips: ${e.message}"
+                Log.e("ChatViewModel", "Error getting tips: ${e.message}", e)
+            } finally {
+                _isLoadingTips.value = false
+            }
+        }
+    }
     fun sendMessage(matchId: String, sender: String, recipient: String, content: String) {
         if (content.trim().isEmpty()) return
 
