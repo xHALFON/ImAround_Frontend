@@ -1,11 +1,18 @@
 package com.example.myapplication.ui.register
 
+import android.Manifest
 import android.app.DatePickerDialog
+import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.GetContent
+import androidx.activity.result.contract.ActivityResultContracts.TakePicture
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,6 +68,8 @@ fun RegisterScreen(
     val aboutMe by remember { registerViewModel.aboutMe }
     val occupation by remember { registerViewModel.occupation }
     var showPreviewDialog by remember { mutableStateOf(false) }
+    var showImageOptions by remember { mutableStateOf(false) }
+    var tempImageUri by remember { mutableStateOf<Uri?>(null) }
 
     // Observe selected hobbies from the HobbyViewModel
     val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
@@ -68,11 +77,75 @@ fun RegisterScreen(
     val authResponse by registerViewModel.authResponse.observeAsState()
     val errorMessage by registerViewModel.errorMessage.observeAsState()
 
+    // Create camera output Uri
+    fun createImageUri(): Uri? {
+        try {
+            val contentResolver = context.contentResolver
+            val imageCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val newImageDetails = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "profile_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            }
+
+            return contentResolver.insert(imageCollection, newImageDetails)
+        } catch (e: Exception) {
+            Log.e("RegisterScreen", "Error creating image URI: ${e.message}")
+            Toast.makeText(
+                context,
+                "Cannot access camera: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+            return null
+        }
+    }
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(GetContent()) { uri ->
         uri?.let {
-            registerViewModel.imageUri.value = it
+            tempImageUri = it
             showPreviewDialog = true
+        }
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(TakePicture()) { success ->
+        if (success && tempImageUri != null) {
+            showPreviewDialog = true
+        } else {
+            Toast.makeText(
+                context,
+                "Failed to capture image",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // For permission checking
+    val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { isGranted ->
+        if (isGranted) {
+            // Permission granted, try launching camera again
+            val cameraUri = createImageUri()
+            if (cameraUri != null) {
+                tempImageUri = cameraUri
+                cameraLauncher.launch(cameraUri)
+            } else {
+                Toast.makeText(
+                    context,
+                    "Failed to create image file",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            Toast.makeText(
+                context,
+                "Camera permission denied",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -103,10 +176,82 @@ fun RegisterScreen(
         }
     }
 
-    // Profile picture preview dialog
-    if (showPreviewDialog && imageUri != null) {
+    // Image options dialog
+    if (showImageOptions) {
         AlertDialog(
-            onDismissRequest = { showPreviewDialog = false },
+            onDismissRequest = { showImageOptions = false },
+            title = { Text("Upload Profile Picture") },
+            text = { Text("Choose a source for your profile picture") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        imagePickerLauncher.launch("image/*")
+                        showImageOptions = false
+                    }
+                ) {
+                    Text("Choose from Gallery")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // Simple approach without using early returns
+                        var shouldLaunchCamera = true
+
+                        // Request camera permission first if needed
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val hasPermission = context.checkSelfPermission(Manifest.permission.CAMERA) ==
+                                    PackageManager.PERMISSION_GRANTED
+
+                            if (!hasPermission) {
+                                // Request camera permission
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                                shouldLaunchCamera = false
+                            }
+                        }
+
+                        // Only proceed if we should launch camera
+                        if (shouldLaunchCamera) {
+                            try {
+                                // Create a Uri for the camera to save the photo to
+                                val photoUri = createImageUri()
+                                if (photoUri != null) {
+                                    tempImageUri = photoUri
+                                    Log.d("RegisterScreen", "Launching camera with URI: $photoUri")
+                                    cameraLauncher.launch(photoUri)
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to create image file",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } catch (e: Exception) {
+                                Log.e("RegisterScreen", "Error launching camera: ${e.message}", e)
+                                Toast.makeText(
+                                    context,
+                                    "Camera error: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+
+                        showImageOptions = false
+                    }
+                ) {
+                    Text("Take Photo")
+                }
+            }
+        )
+    }
+
+    // Profile picture preview dialog
+    if (showPreviewDialog && tempImageUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showPreviewDialog = false
+                tempImageUri = null // Clear temporary URI if cancelled
+            },
             title = { Text("Profile Picture Preview") },
             text = {
                 Column(
@@ -114,7 +259,7 @@ fun RegisterScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Image(
-                        painter = rememberAsyncImagePainter(imageUri),
+                        painter = rememberAsyncImagePainter(tempImageUri),
                         contentDescription = "Selected Image",
                         modifier = Modifier
                             .fillMaxWidth()
@@ -122,18 +267,38 @@ fun RegisterScreen(
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = { showPreviewDialog = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.6f)
-                            .height(48.dp)
-                    ) {
-                        Text(text = "Save", fontSize = 18.sp)
-                    }
                 }
             },
-            confirmButton = {},
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Save the image URI to the ViewModel
+                        registerViewModel.imageUri.value = tempImageUri
+                        showPreviewDialog = false
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(text = "Use Photo", fontSize = 18.sp)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        tempImageUri = null
+                        showPreviewDialog = false
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Gray
+                    )
+                ) {
+                    Text(text = "Cancel", fontSize = 18.sp)
+                }
+            }
         )
     }
 
@@ -215,12 +380,32 @@ fun RegisterScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Profile picture upload
+                // Profile picture upload - Modified to show options dialog
                 Button(
-                    onClick = { imagePickerLauncher.launch("image/*") },
+                    onClick = { showImageOptions = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Upload Profile Picture")
+                }
+
+                // Show selected image if available
+                if (imageUri != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter(imageUri),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(1f)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
