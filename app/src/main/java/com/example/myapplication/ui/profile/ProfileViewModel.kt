@@ -16,6 +16,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     val userProfile = MutableLiveData<User>()
     val errorMessage = MutableLiveData<String>()
+    val logoutSuccess = MutableLiveData<Boolean>()
 
     private val sessionManager = SessionManager(application)
 
@@ -56,6 +57,40 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 Log.e("ProfileViewModel", "Update exception: ${e.message}")
                 errorMessage.postValue(e.localizedMessage ?: "Error updating profile")
                 onError()
+            }
+        }
+    }
+
+    /**
+     * Logs the user out by clearing session data
+     */
+    fun logout() {
+        viewModelScope.launch {
+            try {
+                // Get user id before clearing session
+                val userId = sessionManager.getUserId()
+
+                // Attempt to notify server about logout if needed
+                if (userId != null) {
+                    try {
+                        // If you have a logout endpoint, uncomment and modify this
+                        // RetrofitClient.authService.logout(userId)
+                        Log.d("ProfileViewModel", "Logging out user: $userId")
+                    } catch (e: Exception) {
+                        Log.w("ProfileViewModel", "Failed to notify server about logout: ${e.message}")
+                    }
+                }
+
+                // Clear local session data
+                sessionManager.clearSession()
+                Log.d("ProfileViewModel", "User session cleared")
+
+                // Notify UI about successful logout
+                logoutSuccess.postValue(true)
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Logout error: ${e.message}")
+                errorMessage.postValue("Logout failed: ${e.message}")
+                logoutSuccess.postValue(false)
             }
         }
     }

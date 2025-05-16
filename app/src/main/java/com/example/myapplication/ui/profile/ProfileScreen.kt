@@ -66,11 +66,15 @@ fun ProfileScreen(
         user?.let {
             ProfileContent(
                 user = it,
-                onEditInterestsClick = {
-                    navController.navigate("edit_profile")
+                onEditProfileClick = { navController.navigate("edit_profile") },
+                onLogoutClick = {
+                    // Handle logout logic
+                    viewModel.logout()
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
-
         } ?: run {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -82,7 +86,8 @@ fun ProfileScreen(
 @Composable
 fun ProfileContent(
     user: User,
-    onEditInterestsClick: () -> Unit
+    onEditProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -111,11 +116,106 @@ fun ProfileContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Interests section with edit button
-        InterestsSection(
-            hobbies = user.hobbies ?: emptyList(),
-            onEditClick = onEditInterestsClick
-        )
+        // Interests section
+        if (user.hobbies?.isNotEmpty() == true) {
+            InterestsSection(user.hobbies)
+        }
+
+        // Edit profile button
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 0.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+                .clickable(onClick = onEditProfileClick),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFE8ECF6) // Light blue background
+            ),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = null,
+                        tint = Color(0xFF4F9EC8), // Blue icon color
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = "Edit Profile",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Color.Black
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // Logout button
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 0.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
+                .clickable(onClick = onLogoutClick),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFE8ECF6) // Light blue background
+            ),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Logout,
+                        contentDescription = null,
+                        tint = Color(0xFFE57373), // Red icon color
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = "Logout",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Color.Black
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 
@@ -193,10 +293,7 @@ fun AboutSection(about: String) {
 }
 
 @Composable
-fun InterestsSection(
-    hobbies: List<String>,
-    onEditClick: () -> Unit
-) {
+fun InterestsSection(hobbies: List<String>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -262,24 +359,6 @@ fun InterestsSection(
                 text = "No interests added yet",
                 color = Color.Gray,
                 modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
-
-        // Edit button
-        Button(
-            onClick = onEditClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFF4081)
-            )
-        ) {
-            Text(
-                text = "Edit Profile",
-                fontSize = 16.sp,
-                modifier = Modifier.padding(vertical = 4.dp)
             )
         }
     }
