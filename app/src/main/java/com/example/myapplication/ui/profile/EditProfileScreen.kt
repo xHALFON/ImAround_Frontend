@@ -1,6 +1,12 @@
 package com.example.myapplication.ui.profile
 
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,8 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,24 +68,6 @@ fun EditProfileScreen(
     var showImageOptions by rememberSaveable { mutableStateOf(false) }
     var showImagePreview by rememberSaveable { mutableStateOf(false) }
 
-    // Image pickers
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            tempImageUri = it // Store in temporary URI first
-            showImagePreview = true
-        }
-    }
-
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && tempImageUri != null) {
-            showImagePreview = true
-        }
-    }
-
     val initialized = rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -90,6 +78,84 @@ fun EditProfileScreen(
     }
 
     val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
+
+    // Create camera output Uri
+    fun createImageUri(): Uri? {
+        try {
+            val contentResolver = context.contentResolver
+            val imageCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val newImageDetails = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, "profile_${System.currentTimeMillis()}.jpg")
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            }
+
+            return contentResolver.insert(imageCollection, newImageDetails)
+        } catch (e: Exception) {
+            Log.e("EditProfileScreen", "Error creating image URI: ${e.message}")
+            Toast.makeText(
+                context,
+                "Cannot access camera: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+            return null
+        }
+    }
+
+    // Image pickers
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            tempImageUri = it // Store in temporary URI first
+            showImagePreview = true
+        }
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempImageUri != null) {
+            showImagePreview = true
+        } else {
+            Toast.makeText(
+                context,
+                "Failed to capture image",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // For permission checking
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, try launching camera again
+            val cameraUri = createImageUri()
+            if (cameraUri != null) {
+                tempImageUri = cameraUri
+                cameraLauncher.launch(cameraUri)
+            } else {
+                Toast.makeText(
+                    context,
+                    "Failed to create image file",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            Toast.makeText(
+                context,
+                "Camera permission denied",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     // Image options dialog
     if (showImageOptions) {
@@ -110,12 +176,47 @@ fun EditProfileScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        // For camera, you would typically need a Uri prepared beforehand
-                        // This is simplified here - in a real app you'd need to create a file
-                        // and get a content Uri for it
-                        // imageUri = // create file Uri
-                        // cameraLauncher.launch(imageUri)
-                        Toast.makeText(context, "Camera functionality requires additional setup", Toast.LENGTH_SHORT).show()
+                        // Simple approach without using early returns
+                        var shouldLaunchCamera = true
+
+                        // Request camera permission first if needed
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val hasPermission = context.checkSelfPermission(Manifest.permission.CAMERA) ==
+                                    PackageManager.PERMISSION_GRANTED
+
+                            if (!hasPermission) {
+                                // Request camera permission
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                                shouldLaunchCamera = false
+                            }
+                        }
+
+                        // Only proceed if we should launch camera
+                        if (shouldLaunchCamera) {
+                            try {
+                                // Create a Uri for the camera to save the photo to
+                                val photoUri = createImageUri()
+                                if (photoUri != null) {
+                                    tempImageUri = photoUri
+                                    Log.d("EditProfileScreen", "Launching camera with URI: $photoUri")
+                                    cameraLauncher.launch(photoUri)
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to create image file",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } catch (e: Exception) {
+                                Log.e("EditProfileScreen", "Error launching camera: ${e.message}", e)
+                                Toast.makeText(
+                                    context,
+                                    "Camera error: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+
                         showImageOptions = false
                     }
                 ) {
