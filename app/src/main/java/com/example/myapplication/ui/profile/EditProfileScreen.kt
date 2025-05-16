@@ -1,25 +1,37 @@
 package com.example.myapplication.ui.profile
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.model.User
 import com.example.myapplication.ui.hobbies.HobbyViewModel
 
@@ -33,13 +45,42 @@ fun EditProfileScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    var firstName by remember { mutableStateOf(user.firstName ?: "") }
-    var lastName by remember { mutableStateOf(user.lastName ?: "") }
-    var email by remember { mutableStateOf(user.email ?: "") }
-    var about by remember { mutableStateOf(user.about ?: "") }
-    var occupation by remember { mutableStateOf(user.occupation ?: "") }
+    // Check if there's saved form state in the ViewModel
+    val savedFormState = viewModel.getSavedFormState()
 
-    val initialized = remember { mutableStateOf(false) }
+    // Use rememberSaveable with values from either savedFormState or user
+    var firstName by rememberSaveable { mutableStateOf(savedFormState.firstName.ifEmpty { user.firstName ?: "" }) }
+    var lastName by rememberSaveable { mutableStateOf(savedFormState.lastName.ifEmpty { user.lastName ?: "" }) }
+    var email by rememberSaveable { mutableStateOf(savedFormState.email.ifEmpty { user.email ?: "" }) }
+    var about by rememberSaveable { mutableStateOf(savedFormState.about.ifEmpty { user.about ?: "" }) }
+    var occupation by rememberSaveable { mutableStateOf(savedFormState.occupation.ifEmpty { user.occupation ?: "" }) }
+
+    // For image handling
+    var tempImageUri by rememberSaveable { mutableStateOf<Uri?>(null) } // Temporary URI for preview only
+    var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(savedFormState.selectedImageUri) } // Final selected image for display
+    var currentAvatarUrl by rememberSaveable { mutableStateOf(user.avatar) }
+    var showImageOptions by rememberSaveable { mutableStateOf(false) }
+    var showImagePreview by rememberSaveable { mutableStateOf(false) }
+
+    // Image pickers
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            tempImageUri = it // Store in temporary URI first
+            showImagePreview = true
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempImageUri != null) {
+            showImagePreview = true
+        }
+    }
+
+    val initialized = rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!initialized.value) {
@@ -49,6 +90,112 @@ fun EditProfileScreen(
     }
 
     val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
+
+    // Image options dialog
+    if (showImageOptions) {
+        AlertDialog(
+            onDismissRequest = { showImageOptions = false },
+            title = { Text("Change Profile Picture") },
+            text = { Text("Choose a source for your profile picture") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        imagePickerLauncher.launch("image/*")
+                        showImageOptions = false
+                    }
+                ) {
+                    Text("Choose from Gallery")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // For camera, you would typically need a Uri prepared beforehand
+                        // This is simplified here - in a real app you'd need to create a file
+                        // and get a content Uri for it
+                        // imageUri = // create file Uri
+                        // cameraLauncher.launch(imageUri)
+                        Toast.makeText(context, "Camera functionality requires additional setup", Toast.LENGTH_SHORT).show()
+                        showImageOptions = false
+                    }
+                ) {
+                    Text("Take Photo")
+                }
+            }
+        )
+    }
+
+    // Image preview dialog - FIXED: ensuring perfect circle shape with aspectRatio(1f)
+    if (showImagePreview && tempImageUri != null) {
+        Dialog(onDismissRequest = {
+            showImagePreview = false
+            tempImageUri = null // Clear temporary URI if cancelled
+        }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Profile Picture Preview",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(300.dp)
+                            .aspectRatio(1f) // Ensure perfect circle by maintaining 1:1 aspect ratio
+                            .clip(CircleShape)
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter(tempImageUri),
+                            contentDescription = "Profile Preview",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(
+                            onClick = {
+                                tempImageUri = null // Clear temporary URI
+                                showImagePreview = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Gray
+                            )
+                        ) {
+                            Text("Cancel")
+                        }
+
+                        Button(
+                            onClick = {
+                                // Only assign to selectedImageUri when "Use Photo" is clicked
+                                selectedImageUri = tempImageUri
+                                showImagePreview = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6F75E8)
+                            )
+                        ) {
+                            Text("Use Photo")
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -86,6 +233,54 @@ fun EditProfileScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Center)
             )
+        }
+
+        // Profile image with change option - FIXED: ensure circular shape with aspectRatio(1f)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Profile image
+            Box(
+                modifier = Modifier
+                    .size(180.dp)
+                    .aspectRatio(1f) // Ensure perfect circle by maintaining 1:1 aspect ratio
+            ) {
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        model = selectedImageUri ?: currentAvatarUrl.ifEmpty {
+                            "https://ui-avatars.com/api/?name=${firstName}&background=random"
+                        }
+                    ),
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .border(2.dp, Color.White, CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+
+                // Edit icon for changing picture
+                IconButton(
+                    onClick = { showImageOptions = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.BottomEnd)
+                        .background(
+                            color = Color(0xFF6F75E8),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Change Profile Picture",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
 
         // Form fields
@@ -189,6 +384,16 @@ fun EditProfileScreen(
 
             Button(
                 onClick = {
+                    // Save form data to viewModel before navigating
+                    viewModel.saveFormState(
+                        firstName = firstName,
+                        lastName = lastName,
+                        email = email,
+                        about = about,
+                        occupation = occupation,
+                        selectedImageUri = selectedImageUri
+                    )
+
                     navController.navigate("hobby_selection") {
                         launchSingleTop = true
                     }
@@ -216,6 +421,7 @@ fun EditProfileScreen(
                             occupation = occupation,
                             hobbies = selectedHobbies
                         ),
+                        imageUri = selectedImageUri, // Use the confirmed selectedImageUri
                         onSuccess = {
                             Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
                             navController.popBackStack()
