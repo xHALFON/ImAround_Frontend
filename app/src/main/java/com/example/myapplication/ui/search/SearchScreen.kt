@@ -115,26 +115,75 @@ fun SearchScreen(
         .fillMaxSize()
         .background(Color.White)) {
 
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val infiniteTransition = rememberInfiniteTransition()
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.05f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = EaseInOutQuad),
+                    repeatMode = RepeatMode.Reverse
+                )
+            )
+
+            val pulseAnim by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = EaseInOutQuad),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+
+            // Subtle radar ping effect
+            Canvas(
+                modifier = Modifier
+                    .size(240.dp)
+                    .alpha(0.1f)
+            ) {
+                drawCircle(
+                    color = Color(0xFF1976D2),
+                    radius = size.minDimension * 0.3f * pulseAnim,
+                    style = Stroke(width = 2f)
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "I'm",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2),
+                        letterSpacing = 1.sp
+                    ),
+                    modifier = Modifier.scale(pulseScale)
+                )
+
+                Text(
+                    text = "Around",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Light,
+                        color = Color(0xFF2196F3),
+                        letterSpacing = 1.sp
+                    ),
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+
         // Full screen radar
         ModernRadarBackground(
             modifier = Modifier.fillMaxSize(),
             users = users,
             onUserTap = { selectedUser = it }
-        )
-
-        // Matches icon with animation
-        MatchesIcon(
-            confirmedCount = matches.size,
-            pendingCount = pendingMatches.size + receivedMatches.size,
-            hasNewMatch = hasNewMatch,
-            onMatchesClick = {
-                viewModel.clearNewMatchFlag()
-                showMatchesList = true
-            },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            viewModel = viewModel
         )
 
         // Modern search button
@@ -231,95 +280,6 @@ fun SearchScreen(
                     // navController.navigate("chat/${newMatchUser?.id}")
                 }
             )
-        }
-    }
-}
-
-@Composable
-fun MatchesIcon(
-    confirmedCount: Int,
-    pendingCount: Int,
-    hasNewMatch: Boolean,
-    onMatchesClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: SearchViewModel
-) {
-    val infiniteTransition = rememberInfiniteTransition()
-
-    // Get only received matches count for the badge
-    // Modified to show notifications only for receivedMatches
-    val receivedMatches by viewModel.receivedMatches.observeAsState(emptyList())
-    val receivedCount = receivedMatches.size
-
-    // Animation for new match notification
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (hasNewMatch || receivedCount > 0) 1.2f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = EaseInOutQuad),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = EaseInOutQuad),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    Box(modifier = modifier) {
-        Card(
-            modifier = Modifier
-                .size(56.dp)
-                .scale(if (hasNewMatch || receivedCount > 0) scale else 1f)
-                .graphicsLayer {
-                    if (hasNewMatch || receivedCount > 0) rotationZ = rotationAngle
-                }
-                .clickable { onMatchesClick() },
-            shape = CircleShape,
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 8.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.White
-            )
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = "Matches",
-                    tint = Color(0xFFE91E63),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-
-        // Badge for received matches only
-        if (receivedCount > 0) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE91E63))
-                    .border(1.dp, Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (receivedCount > 9) "9+" else receivedCount.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
         }
     }
 }

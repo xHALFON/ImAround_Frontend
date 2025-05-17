@@ -7,9 +7,4 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class BackendApi {
-    suspend fun findUsers(userIds: List<String>): List<UserResponse> {
-        return withContext(Dispatchers.IO) {
-            RetrofitClient.searchService.findUsers(FindUsersRequest(userIds))
-        }
     }
-}

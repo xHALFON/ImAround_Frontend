@@ -14,4 +14,6 @@ import retrofit2.http.Path
 interface MatchingService {
     @POST("/match/like")
     suspend fun likeUser(@Body request: LikeRequest): LikeResponse
+    @POST("/match/dislike")
+    suspend fun dislikeUser(@Body request: LikeRequest): retrofit2.Response<Void>
 }

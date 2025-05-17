@@ -14,6 +14,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.api.BackendApi
 import com.example.myapplication.data.local.SessionManager
+import com.example.myapplication.data.model.FindUsersRequest
 import com.example.myapplication.data.model.LikeRequest
 import com.example.myapplication.data.model.MatchCheckResponse
 import com.example.myapplication.data.model.MatchStatus
@@ -152,7 +153,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     val idsToSend = newRemoteUserIds.toList()
                     Log.d("BackendApi", "שליחת מזהים חדשים: $idsToSend")
                     try {
-                        val request = com.example.myapplication.data.model.FindUsersRequest(idsToSend)
+                        // שים לב לשינוי כאן - מעבירים גם את מזהה המשתמש הנוכחי
+                        val request = FindUsersRequest(idsToSend, currentUserId)
                         val response = searchService.findUsers(request)
                         _usersResponse.postValue(response)
                     } catch (e: Exception) {
@@ -174,7 +176,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             if (matchData.liked.size >= 2) {
                 // Find the other user ID (not current user)
                 val otherUserId = matchData.participants.find { it != currentUserId } ?: return@setOnMatchListener
-
+                removeUserFromRadar(otherUserId)
                 // Find user data from discovered users
                 val userData = _usersResponse.value?.find { it._id == otherUserId }
 
@@ -298,77 +300,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
 
 
-    // עיבוד תשובת מאצ' ועדכון ממשק המשתמש בהתאם
-    private fun processMatchResponse(response: MatchCheckResponse) {
-        val userId = currentUserId
-
-        // יצירת רשימות לסטטוסים שונים של מאצ'
-        val confirmedMatches = mutableListOf<UserMatch>()
-        val pendingMatches = mutableListOf<UserMatch>()
-        val receivedMatches = mutableListOf<UserMatch>()
-
-        // מעקב אחר מאצ'ים חדשים שלא נראו
-        var hasNewUnseen = false
-        var newMatchUserData: UserResponse? = null
-
-        // עיבוד כל מאצ'
-        response.matchs.forEach { match ->
-            // חיפוש המשתמש האחר במשתתפים
-            val otherUserId = match.participants.find { it != userId } ?: return@forEach
-
-            // חיפוש נתוני משתמש מרשימת המשתמשים שהתגלו
-            val userData = _usersResponse.value?.find { it._id == otherUserId }
-                ?: return@forEach // דילוג אם אין לנו נתוני משתמש
-
-            // בדיקת סטטוס מאצ'
-            val userHasLiked = match.liked.contains(userId)
-            val otherUserHasLiked = match.liked.contains(otherUserId)
-
-            val matchObj = when {
-                userHasLiked && otherUserHasLiked -> {
-                    // זהו מאצ' מאושר
-                    val userMatch = UserMatch(match._id, userData, MatchStatus.CONFIRMED)
-
-                    // בדיקה אם זהו מאצ' חדש שלא נראה
-                    if (!match.seen) {
-                        hasNewUnseen = true
-                        newMatchUserData = userData
-                    }
-
-                    userMatch
-                }
-                userHasLiked -> {
-                    // אתה לייקת אותם, מחכה לתגובה שלהם
-                    UserMatch(match._id, userData, MatchStatus.PENDING)
-                }
-                otherUserHasLiked -> {
-                    // הם לייקו אותך, מחכים לתגובה שלך
-                    UserMatch(match._id, userData, MatchStatus.RECEIVED)
-                }
-                else -> null // לא אמור לקרות
-            }
-
-            matchObj?.let {
-                when (it.status) {
-                    MatchStatus.CONFIRMED -> confirmedMatches.add(it)
-                    MatchStatus.PENDING -> pendingMatches.add(it)
-                    MatchStatus.RECEIVED -> receivedMatches.add(it)
-                }
-            }
-        }
-
-        // עדכון ה-LiveData
-        _matches.postValue(confirmedMatches)
-        _pendingMatches.postValue(pendingMatches)
-        _receivedMatches.postValue(receivedMatches)
-
-        // הצגת התראת מאצ' רק עבור מאצ'ים שלא נראו
-        if (hasNewUnseen && newMatchUserData != null) {
-            _newMatchUser.postValue(newMatchUserData)
-            _hasNewMatch.postValue(true)
-        }
+    private fun removeUserFromRadar(userId: String) {
+        val currentUsers = _usersResponse.value?.toMutableList() ?: mutableListOf()
+        currentUsers.removeIf { it._id == userId }
+        _usersResponse.postValue(currentUsers)
     }
-
     // פונקציה ללייק משתמש - נקראת בעת החלקה ימינה על כרטיס משתמש
     fun likeUser(targetUserId: String) {
         viewModelScope.launch {
@@ -406,10 +342,21 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // פונקציה לדיסלייק משתמש - נקראת בעת החלקה שמאלה על כרטיס משתמש
     fun dislikeUser(targetUserId: String) {
-        // ביישום אמיתי, ייתכן שתרצה לשלוח זאת לשרת
-        Log.d("SearchViewModel", "משתמש $currentUserId לא אהב את משתמש $targetUserId")
+
+        removeUserFromRadar(targetUserId)
+
+        viewModelScope.launch {
+            try {
+                // שליחת בקשת דיסלייק לשרת
+                val request = LikeRequest(currentUserId, targetUserId)
+                matchingService.dislikeUser(request)
+                Log.d("SearchViewModel", "משתמש $currentUserId לא אהב את משתמש $targetUserId - נשלח לשרת")
+            } catch (e: Exception) {
+                // אם נכשל, נרשום לוג אבל לא נודיע למשתמש כי זה לא קריטי
+                Log.e("SearchViewModel", "שגיאה בשליחת dislike לשרת", e)
+            }
+        }
     }
 
     // פונקציה לאישור מאצ' שהתקבל
@@ -445,6 +392,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     // הפעלת התראת מאצ'
                     _newMatchUser.postValue(userData)
                     _hasNewMatch.postValue(true)
+                    removeUserFromRadar(targetUserId)
                 }
             } catch (e: Exception) {
                 Log.e("SearchViewModel", "שגיאה באישור מאצ'", e)
