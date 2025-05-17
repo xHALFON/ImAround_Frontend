@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.register
 
+import androidx.compose.material.icons.filled.Edit
 import android.Manifest
 import android.app.DatePickerDialog
 import android.content.ContentValues
@@ -380,31 +381,99 @@ fun RegisterScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Profile picture upload - Modified to show options dialog
-                Button(
-                    onClick = { showImageOptions = true },
-                    modifier = Modifier.fillMaxWidth()
+                // Profile picture upload - Modern styled button
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showImageOptions = true }
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF5F5F5)
+                    )
                 ) {
-                    Text("Upload Profile Picture")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Profile Picture",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color(0xFF4A148C)
+                            )
+                            Text(
+                                text = if (imageUri != null) "Change your photo" else "Upload a photo of yourself",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .background(
+                                    color = Color(0xFF6F75E8),
+                                    shape = RoundedCornerShape(percent = 50)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Upload photo",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Show selected image if available
                 if (imageUri != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp)
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+                            .height(200.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     ) {
-                        Image(
-                            painter = rememberAsyncImagePainter(imageUri),
-                            contentDescription = "Profile Picture",
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f)
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = rememberAsyncImagePainter(imageUri),
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+
+                            // Overlay edit button
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                                    .size(36.dp)
+                                    .background(
+                                        color = Color(0xFF6F75E8),
+                                        shape = RoundedCornerShape(percent = 50)
+                                    )
+                                    .clickable { showImageOptions = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Change photo",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

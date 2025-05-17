@@ -191,4 +191,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val occupation: String = "",
         val selectedImageUri: Uri? = null
     )
+    /**
+     * Clears the saved form state after a successful update
+     */
+    fun clearFormState() {
+        _formState.value = FormState()
+    }
 }
