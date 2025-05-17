@@ -5,6 +5,8 @@ import android.Manifest
 import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.ui.draw.scale
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -49,6 +51,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.ui.components.ProfilePhotoAnalysisTip
 
 @Composable
 fun RegisterScreen(
@@ -77,7 +80,9 @@ fun RegisterScreen(
 
     val authResponse by registerViewModel.authResponse.observeAsState()
     val errorMessage by registerViewModel.errorMessage.observeAsState()
-
+    val isAnalyzingPhoto by registerViewModel.isAnalyzingPhoto.observeAsState(false)
+    val photoAnalysisFeedback by registerViewModel.photoAnalysisFeedback.observeAsState()
+    var showPhotoTip by remember { mutableStateOf(false) }
     // Create camera output Uri
     fun createImageUri(): Uri? {
         try {
@@ -246,12 +251,13 @@ fun RegisterScreen(
         )
     }
 
-    // Profile picture preview dialog
     if (showPreviewDialog && tempImageUri != null) {
         AlertDialog(
             onDismissRequest = {
                 showPreviewDialog = false
                 tempImageUri = null // Clear temporary URI if cancelled
+                registerViewModel.clearPhotoAnalysisFeedback() // ניקוי הפידבק
+                showPhotoTip = false
             },
             title = { Text("Profile Picture Preview") },
             text = {
@@ -259,15 +265,56 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Image(
-                        painter = rememberAsyncImagePainter(tempImageUri),
-                        contentDescription = "Selected Image",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter(tempImageUri),
+                            contentDescription = "Selected Image",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+
+                        if (photoAnalysisFeedback == null && !isAnalyzingPhoto && !showPhotoTip) {
+                            // כפתור מנורה להפעלת ניתוח התמונה
+                            FloatingActionButton(
+                                onClick = {
+                                    tempImageUri?.let {
+                                        registerViewModel.analyzeProfilePhoto(it)
+                                        showPhotoTip = true
+                                    }
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                                    .size(48.dp),
+                                containerColor = Color(0xFF6366F1)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lightbulb,
+                                    contentDescription = "Analyze photo",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    // הצגת הטיפ אם יש צורך
+                    if (showPhotoTip) {
+                        ProfilePhotoAnalysisTip(
+                            tip = photoAnalysisFeedback ?: "", // הוספת הניהול של null
+                            isLoading = isAnalyzingPhoto,
+                            onDismiss = {
+                                showPhotoTip = false
+                                registerViewModel.clearPhotoAnalysisFeedback()
+                            }
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -276,6 +323,8 @@ fun RegisterScreen(
                         // Save the image URI to the ViewModel
                         registerViewModel.imageUri.value = tempImageUri
                         showPreviewDialog = false
+                        registerViewModel.clearPhotoAnalysisFeedback()
+                        showPhotoTip = false
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -289,6 +338,8 @@ fun RegisterScreen(
                     onClick = {
                         tempImageUri = null
                         showPreviewDialog = false
+                        registerViewModel.clearPhotoAnalysisFeedback()
+                        showPhotoTip = false
                     },
                     modifier = Modifier
                         .fillMaxWidth()
