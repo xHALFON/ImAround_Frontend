@@ -35,6 +35,10 @@ object RetrofitClient {
         Log.d("InfoTrack", "RetrofitClient: chatService")
         retrofit.create(ChatService::class.java)
     }
+
+    val profilePhotoAnalysisService: ProfilePhotoAnalysisService by lazy {
+        retrofit.create(ProfilePhotoAnalysisService::class.java)
+    }
 }
 
 object CloudinaryClient {

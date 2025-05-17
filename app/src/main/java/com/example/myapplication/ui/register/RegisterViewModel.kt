@@ -3,7 +3,12 @@ package com.example.myapplication.ui.register
 import AuthResponse
 import RegisterRequest
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Base64 // שינוי הייבוא מ-Socket.IO ל-Android
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -18,6 +23,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.InputStream
 import com.example.myapplication.data.network.CloudinaryClient
 import com.example.myapplication.data.network.CloudinaryUploadResponse
+import com.example.myapplication.data.network.ProfilePhotoAnalysisRequest
+import java.io.ByteArrayOutputStream
 
 class RegisterViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -34,7 +41,11 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     var aboutMe = mutableStateOf("")
     var occupation = mutableStateOf("")
 
-    // We don't need to manage hobbies here anymore as it's handled by HobbyViewModel
+    private val _photoAnalysisFeedback = MutableLiveData<String?>()
+    val photoAnalysisFeedback: LiveData<String?> = _photoAnalysisFeedback // תיקון הטיפוס ל-String?
+
+    private val _isAnalyzingPhoto = MutableLiveData<Boolean>(false)
+    val isAnalyzingPhoto: LiveData<Boolean> = _isAnalyzingPhoto
 
     fun registerUser(
         firstName: String,
@@ -88,5 +99,100 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         Log.d("CloudinaryUpload", "Uploaded to: ${response.secure_url}")
 
         return response.secure_url
+    }
+
+    fun analyzeProfilePhoto(imageUri: Uri) {
+        _isAnalyzingPhoto.value = true
+
+        viewModelScope.launch {
+            try {
+                // המרת ה-Uri לBase64
+                val base64Image = convertImageToBase64(imageUri)
+
+                if (base64Image != null) {
+                    val request = ProfilePhotoAnalysisRequest(base64Image)
+                    val response = RetrofitClient.profilePhotoAnalysisService.analyzeProfilePhoto(request)
+
+                    if (response.isSuccessful && response.body() != null) {
+                        _photoAnalysisFeedback.postValue(response.body()!!.feedback)
+                    } else {
+                        _photoAnalysisFeedback.postValue("Could not analyze image. Please try again.")
+                    }
+                } else {
+                    _photoAnalysisFeedback.postValue("Failed to process image.")
+                }
+            } catch (e: Exception) {
+                _photoAnalysisFeedback.postValue("Error: ${e.localizedMessage ?: "Unknown error"}")
+                Log.e("RegisterViewModel", "Error analyzing photo", e)
+            } finally {
+                _isAnalyzingPhoto.value = false
+            }
+        }
+    }
+
+    /**
+     * ממיר Uri של תמונה למחרוזת Base64
+     */
+    private fun convertImageToBase64(uri: Uri): String? {
+        try {
+            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val source = ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)
+                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    decoder.isMutableRequired = true
+                }
+            } else {
+                MediaStore.Images.Media.getBitmap(getApplication<Application>().contentResolver, uri)
+            }
+
+            // דחיסת התמונה
+            val compressedBitmap = compressBitmap(bitmap)
+
+            val outputStream = ByteArrayOutputStream()
+            compressedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+
+            // המרה ל-Base64 והוספת קידומת של Data URI
+            val base64String = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
+            return "data:image/jpeg;base64,$base64String"
+        } catch (e: Exception) {
+            Log.e("RegisterViewModel", "Error converting image to base64", e)
+            return null
+        }
+    }
+
+    /**
+     * דוחס את התמונה לגודל סביר לשליחה
+     */
+    private fun compressBitmap(originalBitmap: Bitmap): Bitmap {
+        val maxWidth = 800
+        val maxHeight = 800
+
+        val width = originalBitmap.width
+        val height = originalBitmap.height
+
+        // אם התמונה כבר קטנה מספיק, אין צורך לדחוס
+        if (width <= maxWidth && height <= maxHeight) {
+            return originalBitmap
+        }
+
+        // חישוב יחס הגודל החדש
+        val ratio = width.toFloat() / height.toFloat()
+
+        val newWidth: Int
+        val newHeight: Int
+
+        if (width > height) {
+            newWidth = maxWidth
+            newHeight = (newWidth / ratio).toInt()
+        } else {
+            newHeight = maxHeight
+            newWidth = (newHeight * ratio).toInt()
+        }
+
+        return Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+    }
+
+    fun clearPhotoAnalysisFeedback() {
+        _photoAnalysisFeedback.value = null
     }
 }
