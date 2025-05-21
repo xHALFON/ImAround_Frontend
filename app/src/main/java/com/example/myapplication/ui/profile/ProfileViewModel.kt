@@ -126,7 +126,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         email: String,
         about: String,
         occupation: String,
-        selectedImageUri: Uri?
+        selectedImageUri: Uri?,
+        genderInterest: String = ""  // Added genderInterest parameter
     ) {
         _formState.value = FormState(
             firstName = firstName,
@@ -134,9 +135,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             email = email,
             about = about,
             occupation = occupation,
-            selectedImageUri = selectedImageUri
+            selectedImageUri = selectedImageUri,
+            genderInterest = genderInterest  // Added to form state
         )
-        Log.d("ProfileViewModel", "Form state saved: firstName=$firstName, lastName=$lastName")
+        Log.d("ProfileViewModel", "Form state saved: firstName=$firstName, lastName=$lastName, genderInterest=$genderInterest")
     }
 
     /**
@@ -181,7 +183,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Data class to hold form state
+     * Data class to hold form state - Updated to include genderInterest
      */
     data class FormState(
         val firstName: String = "",
@@ -189,8 +191,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val email: String = "",
         val about: String = "",
         val occupation: String = "",
-        val selectedImageUri: Uri? = null
+        val selectedImageUri: Uri? = null,
+        val genderInterest: String = ""  // Added genderInterest field
     )
+
     /**
      * Clears the saved form state after a successful update
      */

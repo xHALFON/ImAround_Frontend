@@ -44,6 +44,7 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.model.User
 import com.example.myapplication.ui.hobbies.HobbyViewModel
+import com.example.myapplication.ui.components.GenderInterestSelector
 
 // Define theme colors
 val PrimaryColor = Color(0xFF6F75E8)
@@ -112,6 +113,14 @@ fun EditProfileScreen(
         )
     }
 
+    // Add genderInterest state
+    var genderInterest by rememberSaveable {
+        mutableStateOf(
+            if (savedFormState.genderInterest.isNotEmpty()) savedFormState.genderInterest
+            else user.genderInterest ?: ""
+        )
+    }
+
     // For image handling
     var tempImageUri by rememberSaveable { mutableStateOf<Uri?>(null) } // Temporary URI for preview only
     var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(savedFormState.selectedImageUri) } // Final selected image for display
@@ -141,6 +150,9 @@ fun EditProfileScreen(
                 }
                 if (occupation.isEmpty() || occupation != newUser.occupation) {
                     occupation = newUser.occupation ?: ""
+                }
+                if (genderInterest.isEmpty() || genderInterest != newUser.genderInterest) {
+                    genderInterest = newUser.genderInterest ?: ""
                 }
 
                 // Update avatar URL if changed
@@ -660,6 +672,37 @@ fun EditProfileScreen(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
+                // Dating Preferences Section - NEW
+                Text(
+                    text = "Dating Preferences",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryColor,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+
+                        GenderInterestSelector(
+                            selectedGender = genderInterest,
+                            onGenderSelected = { genderInterest = it }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(30.dp))
+
                 // Interests section - Redesigned to match ProfileScreen
                 Text(
                     text = "Interests",
@@ -705,7 +748,8 @@ fun EditProfileScreen(
                                         email = email,
                                         about = about,
                                         occupation = occupation,
-                                        selectedImageUri = selectedImageUri
+                                        selectedImageUri = selectedImageUri,
+                                        genderInterest = genderInterest  // Add gender interest to saved form state
                                     )
 
                                     navController.navigate("hobby_selection") {
@@ -739,7 +783,7 @@ fun EditProfileScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     rowHobbies.forEach { hobby ->
-                                        com.example.myapplication.ui.profile.HobbyChip(
+                                        EditProfileHobbyChip(
                                             hobby = hobby,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -775,7 +819,8 @@ fun EditProfileScreen(
                                 email = user.email ?: email,
                                 about = about,
                                 occupation = occupation,
-                                hobbies = selectedHobbies
+                                hobbies = selectedHobbies,
+                                genderInterest = genderInterest  // Add gender interest to updated user
                             ),
                             imageUri = selectedImageUri,
                             onSuccess = {
@@ -878,4 +923,95 @@ fun ModernTextField(
             }
         }
     }
+}
+
+@Composable
+fun EditProfileHobbyChip(
+    hobby: String,
+    modifier: Modifier = Modifier
+) {
+    // Convert the hobby string to a HobbyItem for consistent styling
+    val hobbyItem = getHobbyItemForName(hobby)
+
+    val backgroundColor = hobbyItem.color
+    val borderColor = hobbyItem.color
+    val textColor = Color.Black
+    val iconColor = Color.Black
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = hobbyItem.icon,
+            contentDescription = hobbyItem.name,
+            tint = iconColor,
+            modifier = Modifier.size(16.dp)
+        )
+
+        Text(
+            text = hobbyItem.name,
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 14.sp
+        )
+    }
+}
+
+// Function to match hobby string to HobbyItem for consistency
+fun getHobbyItemForName(hobbyName: String): com.example.myapplication.ui.components.HobbyItem {
+    val hobbies = listOf(
+        com.example.myapplication.ui.components.HobbyItem("gaming", "Gaming", Icons.Filled.SportsEsports, Color(0xFFE0E0E0)),
+        com.example.myapplication.ui.components.HobbyItem("dancing", "Dancing", Icons.Filled.MusicNote, Color(0xFFFFEBEE)),
+        com.example.myapplication.ui.components.HobbyItem("language", "Language", Icons.Filled.Translate, Color(0xFFE0F7FA)),
+        com.example.myapplication.ui.components.HobbyItem("music", "Music", Icons.Filled.MusicNote, Color(0xFFE1BEE7)),
+        com.example.myapplication.ui.components.HobbyItem("movie", "Movie", Icons.Filled.Movie, Color(0xFFF8BBD0)),
+        com.example.myapplication.ui.components.HobbyItem("photography", "Photography", Icons.Filled.PhotoCamera, Color(0xFFE0E0E0)),
+        com.example.myapplication.ui.components.HobbyItem("architecture", "Architecture", Icons.Filled.Architecture, Color(0xFFE0E0E0)),
+        com.example.myapplication.ui.components.HobbyItem("fashion", "Fashion", Icons.Filled.Checkroom, Color(0xFFF8BBD0)),
+        com.example.myapplication.ui.components.HobbyItem("book", "Book", Icons.Filled.MenuBook, Color(0xFFE1BEE7)),
+        com.example.myapplication.ui.components.HobbyItem("writing", "Writing", Icons.Filled.Create, Color(0xFFE0E0E0)),
+        com.example.myapplication.ui.components.HobbyItem("nature", "Nature", Icons.Filled.Park, Color(0xFFDCEDC8)),
+        com.example.myapplication.ui.components.HobbyItem("painting", "Painting", Icons.Filled.Palette, Color(0xFFFFF9C4)),
+        com.example.myapplication.ui.components.HobbyItem("football", "Football", Icons.Filled.SportsSoccer, Color(0xFFE0E0E0)),
+        com.example.myapplication.ui.components.HobbyItem("people", "People", Icons.Filled.People, Color(0xFFFFF9C4)),
+        com.example.myapplication.ui.components.HobbyItem("animals", "Animals", Icons.Filled.Pets, Color(0xFFE1BEE7)),
+        com.example.myapplication.ui.components.HobbyItem("fitness", "Gym & Fitness", Icons.Filled.FitnessCenter, Color(0xFFFFF9C4)),
+        // Fallback for other hobbies
+        com.example.myapplication.ui.components.HobbyItem("travel", "Travel", Icons.Filled.Flight, Color(0xFFDCEDC8)),
+        com.example.myapplication.ui.components.HobbyItem("food", "Food", Icons.Filled.Restaurant, Color(0xFFE0F7FA)),
+        com.example.myapplication.ui.components.HobbyItem("cooking", "Cooking", Icons.Filled.Fastfood, Color(0xFFFFEBEE)),
+        com.example.myapplication.ui.components.HobbyItem("technology", "Technology", Icons.Filled.Devices, Color(0xFFE0E0E0))
+    )
+
+    // Try to find exact match
+    val exactMatch = hobbies.find { it.id.equals(hobbyName.lowercase()) || it.name.equals(hobbyName, ignoreCase = true) }
+    if (exactMatch != null) {
+        return exactMatch
+    }
+
+    // If no exact match, try partial match
+    val partialMatch = hobbies.find {
+        hobbyName.lowercase().contains(it.id) ||
+                it.id.contains(hobbyName.lowercase()) ||
+                hobbyName.lowercase().contains(it.name.lowercase()) ||
+                it.name.lowercase().contains(hobbyName.lowercase())
+    }
+    if (partialMatch != null) {
+        return partialMatch.copy(name = hobbyName)  // Use the original hobby name but keep the icon/color
+    }
+
+    // Default fallback
+    return com.example.myapplication.ui.components.HobbyItem(
+        hobbyName.lowercase(),
+        hobbyName,
+        Icons.Filled.Star,
+        Color(0xFFE0E0E0)
+    )
 }

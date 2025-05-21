@@ -112,20 +112,22 @@ fun ProfileContent(
         // About section
         if (!user.about.isNullOrEmpty()) {
             AboutSection(user.about)
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+
 
         // Interests section
         if (user.hobbies?.isNotEmpty() == true) {
             InterestsSection(user.hobbies)
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
         // Edit profile button
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 0.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+                .padding(start = 0.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
                 .clickable(onClick = onEditProfileClick),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
@@ -255,11 +257,13 @@ fun ProfileHeader(user: User) {
         }
 
         // Occupation if available
-        Text(
-            text = user.occupation ?: "",
-            fontSize = 16.sp,
-            color = Color.Gray
-        )
+        if (!user.occupation.isNullOrEmpty()) {
+            Text(
+                text = user.occupation,
+                fontSize = 16.sp,
+                color = Color.Gray
+            )
+        }
     }
 }
 
@@ -289,6 +293,48 @@ fun AboutSection(about: String) {
             fontSize = 16.sp,
             color = Color.DarkGray
         )
+    }
+}
+
+
+@Composable
+fun GenderInterestChip(genderInterest: String) {
+    val (color, icon, displayText) = when (genderInterest.lowercase()) {
+        "male" -> Triple(Color(0xFF90CAF9), Icons.Filled.Male, "Interested in Men")
+        "female" -> Triple(Color(0xFFFFAB91), Icons.Filled.Female, "Interested in Women")
+        "both" -> Triple(Color(0xFFCE93D8), Icons.Filled.Groups, "Interested in Everyone")
+        else -> Triple(Color(0xFFE0E0E0), Icons.Filled.Person, "Open to All")
+    }
+
+    Surface(
+        modifier = Modifier
+            .wrapContentWidth()
+            .height(40.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = color
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.Black.copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = displayText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black.copy(alpha = 0.8f),
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -447,12 +493,11 @@ fun calculateAge(birthDate: String): Int {
         } else {
             // Attempt to parse as ISO format (YYYY-MM-DD)
             val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val birthDate = format.parse(birthDate)
+            val birthDateParsed = format.parse(birthDate)
             val calendar = Calendar.getInstance()
-            val today = calendar.time
 
             val birthCalendar = Calendar.getInstance()
-            birthCalendar.time = birthDate
+            birthCalendar.time = birthDateParsed
 
             var age = calendar.get(Calendar.YEAR) - birthCalendar.get(Calendar.YEAR)
 
