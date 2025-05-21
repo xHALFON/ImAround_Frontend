@@ -262,13 +262,14 @@ fun ActionButtonsSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Edit profile button - Modern gradient style
         Button(
             onClick = onEditProfileClick,
             modifier = Modifier
-                .fillMaxWidth()
+                .width(225.dp) // Fixed width instead of fillMaxWidth
                 .height(40.dp)
                 .shadow(
                     elevation = 4.dp,
@@ -306,7 +307,7 @@ fun ActionButtonsSection(
         OutlinedButton(
             onClick = onLogoutClick,
             modifier = Modifier
-                .fillMaxWidth()
+                .width(225.dp) // Fixed width instead of fillMaxWidth
                 .height(40.dp),
             shape = RoundedCornerShape(28.dp),
             border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -338,7 +339,7 @@ fun ActionButtonsSection(
 
         Spacer(modifier = Modifier.height(15.dp))
 
-        // Delete account button - Danger style
+        // Delete account button - Danger style (kept full width)
         TextButton(
             onClick = onDeleteAccountClick,
             modifier = Modifier
