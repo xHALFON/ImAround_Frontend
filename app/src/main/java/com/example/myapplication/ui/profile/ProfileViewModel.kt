@@ -25,6 +25,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val userProfile = MutableLiveData<User>()
     val errorMessage = MutableLiveData<String>()
     val logoutSuccess = MutableLiveData<Boolean>()
+    // Add state for delete account
+    val deleteAccountSuccess = MutableLiveData<Boolean>()
 
     // Form state management
     private val _formState = MutableStateFlow(FormState())
@@ -90,6 +92,42 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 Log.e("ProfileViewModel", "Update exception: ${e.message}")
                 errorMessage.postValue(e.localizedMessage ?: "Error updating profile")
                 onError()
+            }
+        }
+    }
+
+    /**
+     * Deletes the user account
+     */
+    fun deleteAccount() {
+        val userId = sessionManager.getUserId()
+
+        if (userId == null) {
+            errorMessage.postValue("User ID not found in session")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Call your API to delete the user account
+                val response = RetrofitClient.authService.deleteUser(userId)
+
+                if (response.isSuccessful) {
+                    // Clear local session data
+                    sessionManager.clearSession()
+                    Log.d("ProfileViewModel", "User account deleted and session cleared")
+
+                    // Notify UI about successful deletion
+                    deleteAccountSuccess.postValue(true)
+                } else {
+                    Log.e("ProfileViewModel", "Delete account failed: ${response.errorBody()?.string()}")
+                    errorMessage.postValue("Failed to delete account")
+                    deleteAccountSuccess.postValue(false)
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Delete account error: ${e.message}")
+                errorMessage.postValue(e.localizedMessage ?: "Error deleting account")
+                deleteAccountSuccess.postValue(false)
             }
         }
     }

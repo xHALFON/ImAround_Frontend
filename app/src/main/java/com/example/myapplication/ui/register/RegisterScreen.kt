@@ -829,13 +829,7 @@ fun RegisterScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Text(
-                            text = "I am interested in",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TextPrimaryColor,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
+
 
                         GenderInterestSelector(
                             selectedGender = genderInterest,

@@ -2,6 +2,10 @@ package com.example.myapplication.ui.profile
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +23,8 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -43,7 +50,12 @@ fun ProfileScreen(
     val context = LocalContext.current
     val user by viewModel.userProfile.observeAsState()
     val error by viewModel.errorMessage.observeAsState()
+    val logoutSuccess by viewModel.logoutSuccess.observeAsState()
+    val deleteAccountSuccess by viewModel.deleteAccountSuccess.observeAsState()
     val scrollState = rememberScrollState()
+
+    // State for delete account confirmation dialog
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Load profile
     LaunchedEffect(Unit) {
@@ -58,6 +70,36 @@ fun ProfileScreen(
         }
     }
 
+    // Handle logout success
+    LaunchedEffect(logoutSuccess) {
+        if (logoutSuccess == true) {
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    // Handle delete account success
+    LaunchedEffect(deleteAccountSuccess) {
+        if (deleteAccountSuccess == true) {
+            Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    // Delete account confirmation dialog
+    if (showDeleteDialog) {
+        DeleteAccountDialog(
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                viewModel.deleteAccount()
+            }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -67,13 +109,8 @@ fun ProfileScreen(
             ProfileContent(
                 user = it,
                 onEditProfileClick = { navController.navigate("edit_profile") },
-                onLogoutClick = {
-                    // Handle logout logic
-                    viewModel.logout()
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
+                onLogoutClick = { viewModel.logout() },
+                onDeleteAccountClick = { showDeleteDialog = true }
             )
         } ?: run {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -84,10 +121,92 @@ fun ProfileScreen(
 }
 
 @Composable
+fun DeleteAccountDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = Color.Red,
+                    modifier = Modifier.size(48.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Delete Account",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Gray
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Button(
+                        onClick = onConfirm,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text("Delete")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ProfileContent(
     user: User,
     onEditProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -123,98 +242,128 @@ fun ProfileContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Edit profile button
-        Card(
+        // Action Buttons
+        ActionButtonsSection(
+            onEditProfileClick = onEditProfileClick,
+            onLogoutClick = onLogoutClick,
+            onDeleteAccountClick = onDeleteAccountClick
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun ActionButtonsSection(
+    onEditProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        // Edit profile button - Modern gradient style
+        Button(
+            onClick = onEditProfileClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 0.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
-                .clickable(onClick = onEditProfileClick),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFE8ECF6) // Light blue background
-            ),
-            elevation = CardDefaults.cardElevation(0.dp)
+                .height(40.dp)
+                .shadow(
+                    elevation = 4.dp,
+                    shape = RoundedCornerShape(28.dp)
+                ),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp, horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = null,
-                        tint = Color(0xFF4F9EC8), // Blue icon color
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Text(
-                        text = "Edit Profile",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color.Black
-                    )
-                }
-
                 Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit Profile",
+                    tint = Color.White
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "Edit Profile",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
         }
 
-        // Logout button
-        Card(
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Logout button - Outlined style
+        OutlinedButton(
+            onClick = onLogoutClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 0.dp, end = 16.dp, top = 8.dp, bottom = 24.dp)
-                .clickable(onClick = onLogoutClick),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFE8ECF6) // Light blue background
+                .height(40.dp),
+            shape = RoundedCornerShape(28.dp),
+            border = ButtonDefaults.outlinedButtonBorder.copy(
+                width = 2.dp
             ),
-            elevation = CardDefaults.cardElevation(0.dp)
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.primary
+            )
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp, horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Logout,
-                        contentDescription = null,
-                        tint = Color(0xFFE57373), // Red icon color
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Text(
-                        text = "Logout",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color.Black
-                    )
-                }
-
                 Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Filled.Logout,
+                    contentDescription = "Logout",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "Logout",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(15.dp))
+
+        // Delete account button - Danger style
+        TextButton(
+            onClick = onDeleteAccountClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = Color.Red
+            )
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Delete Account",
+                    tint = Color.Red
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Delete Account",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -239,7 +388,8 @@ fun ProfileHeader(user: User) {
             contentDescription = "Profile Picture",
             modifier = Modifier
                 .size(250.dp)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .shadow(elevation = 8.dp, shape = CircleShape),
             contentScale = ContentScale.Crop
         )
 
@@ -297,46 +447,6 @@ fun AboutSection(about: String) {
 }
 
 
-@Composable
-fun GenderInterestChip(genderInterest: String) {
-    val (color, icon, displayText) = when (genderInterest.lowercase()) {
-        "male" -> Triple(Color(0xFF90CAF9), Icons.Filled.Male, "Interested in Men")
-        "female" -> Triple(Color(0xFFFFAB91), Icons.Filled.Female, "Interested in Women")
-        "both" -> Triple(Color(0xFFCE93D8), Icons.Filled.Groups, "Interested in Everyone")
-        else -> Triple(Color(0xFFE0E0E0), Icons.Filled.Person, "Open to All")
-    }
-
-    Surface(
-        modifier = Modifier
-            .wrapContentWidth()
-            .height(40.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = color
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.Black.copy(alpha = 0.7f),
-                modifier = Modifier.size(18.dp)
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = displayText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.Black.copy(alpha = 0.8f),
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
 
 @Composable
 fun InterestsSection(hobbies: List<String>) {
