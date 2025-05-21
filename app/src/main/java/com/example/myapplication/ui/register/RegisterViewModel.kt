@@ -8,7 +8,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Base64 // שינוי הייבוא מ-Socket.IO ל-Android
+import android.util.Base64
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -40,9 +40,10 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     var imageUri = mutableStateOf<Uri?>(null)
     var aboutMe = mutableStateOf("")
     var occupation = mutableStateOf("")
+    var genderInterest = mutableStateOf("") // New field for gender interest
 
     private val _photoAnalysisFeedback = MutableLiveData<String?>()
-    val photoAnalysisFeedback: LiveData<String?> = _photoAnalysisFeedback // תיקון הטיפוס ל-String?
+    val photoAnalysisFeedback: LiveData<String?> = _photoAnalysisFeedback
 
     private val _isAnalyzingPhoto = MutableLiveData<Boolean>(false)
     val isAnalyzingPhoto: LiveData<Boolean> = _isAnalyzingPhoto
@@ -56,6 +57,7 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         imageUri: Uri?,
         aboutMe: String,
         occupation: String,
+        genderInterest: String, // Added parameter
         hobbies: List<String> = emptyList()
     ) {
         viewModelScope.launch {
@@ -71,10 +73,12 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     avatar = imageUrl,
                     about = aboutMe,
                     occupation = occupation,
+                    genderInterest = genderInterest, // Include in request
                     hobbies = hobbies
                 )
                 Log.d("RegisterViewModel", "Image URL to send: $imageUrl")
                 Log.d("RegisterViewModel", "Hobbies to send: $hobbies")
+                Log.d("RegisterViewModel", "Gender interest to send: $genderInterest")
                 val response = RetrofitClient.authService.registerUser(request)
                 authResponse.postValue(response)
             } catch (e: Exception) {

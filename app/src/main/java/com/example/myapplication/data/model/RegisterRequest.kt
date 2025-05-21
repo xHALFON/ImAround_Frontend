@@ -8,5 +8,6 @@ data class RegisterRequest(
     val avatar: String,
     val hobbies: List<String> = emptyList(), // Added hobbies field
     val about: String = "",
+    val genderInterest: String,
     val occupation: String = "",
 )

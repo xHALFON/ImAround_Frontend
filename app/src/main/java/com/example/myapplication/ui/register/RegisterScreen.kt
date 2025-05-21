@@ -20,13 +20,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -37,21 +34,28 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
-import com.example.myapplication.ui.components.BottomComponent
-import com.example.myapplication.ui.components.CheckboxComponent
 import com.example.myapplication.ui.components.DatePickerField
-import com.example.myapplication.ui.components.HeadingTextComponent
-import com.example.myapplication.ui.components.MyTextFieldComponent
-import com.example.myapplication.ui.components.NormalTextComponent
-import com.example.myapplication.ui.components.PasswordTextFieldComponent
+import com.example.myapplication.ui.components.GenderInterestSelector
 import com.example.myapplication.ui.hobbies.HobbyViewModel
 import java.util.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import com.example.myapplication.ui.components.ProfilePhotoAnalysisTip
+import androidx.compose.ui.window.Dialog
+import com.example.myapplication.ui.components.HobbyItem
+import com.example.myapplication.ui.components.ModernTextField
+import com.example.myapplication.ui.profile.*
 
 @Composable
 fun RegisterScreen(
@@ -71,6 +75,7 @@ fun RegisterScreen(
     val imageUri by remember { registerViewModel.imageUri }
     val aboutMe by remember { registerViewModel.aboutMe }
     val occupation by remember { registerViewModel.occupation }
+    val genderInterest by remember { registerViewModel.genderInterest }
     var showPreviewDialog by remember { mutableStateOf(false) }
     var showImageOptions by remember { mutableStateOf(false) }
     var tempImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -83,6 +88,7 @@ fun RegisterScreen(
     val isAnalyzingPhoto by registerViewModel.isAnalyzingPhoto.observeAsState(false)
     val photoAnalysisFeedback by registerViewModel.photoAnalysisFeedback.observeAsState()
     var showPhotoTip by remember { mutableStateOf(false) }
+
     // Create camera output Uri
     fun createImageUri(): Uri? {
         try {
@@ -184,102 +190,179 @@ fun RegisterScreen(
 
     // Image options dialog
     if (showImageOptions) {
-        AlertDialog(
-            onDismissRequest = { showImageOptions = false },
-            title = { Text("Upload Profile Picture") },
-            text = { Text("Choose a source for your profile picture") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        imagePickerLauncher.launch("image/*")
-                        showImageOptions = false
-                    }
-                ) {
-                    Text("Choose from Gallery")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        // Simple approach without using early returns
-                        var shouldLaunchCamera = true
-
-                        // Request camera permission first if needed
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            val hasPermission = context.checkSelfPermission(Manifest.permission.CAMERA) ==
-                                    PackageManager.PERMISSION_GRANTED
-
-                            if (!hasPermission) {
-                                // Request camera permission
-                                permissionLauncher.launch(Manifest.permission.CAMERA)
-                                shouldLaunchCamera = false
-                            }
-                        }
-
-                        // Only proceed if we should launch camera
-                        if (shouldLaunchCamera) {
-                            try {
-                                // Create a Uri for the camera to save the photo to
-                                val photoUri = createImageUri()
-                                if (photoUri != null) {
-                                    tempImageUri = photoUri
-                                    Log.d("RegisterScreen", "Launching camera with URI: $photoUri")
-                                    cameraLauncher.launch(photoUri)
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Failed to create image file",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            } catch (e: Exception) {
-                                Log.e("RegisterScreen", "Error launching camera: ${e.message}", e)
-                                Toast.makeText(
-                                    context,
-                                    "Camera error: ${e.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-
-                        showImageOptions = false
-                    }
-                ) {
-                    Text("Take Photo")
-                }
-            }
-        )
-    }
-
-    if (showPreviewDialog && tempImageUri != null) {
-        AlertDialog(
-            onDismissRequest = {
-                showPreviewDialog = false
-                tempImageUri = null // Clear temporary URI if cancelled
-                registerViewModel.clearPhotoAnalysisFeedback() // ניקוי הפידבק
-                showPhotoTip = false
-            },
-            title = { Text("Profile Picture Preview") },
-            text = {
+        Dialog(onDismissRequest = { showImageOptions = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Text(
+                        text = "Upload Profile Picture",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryColor
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Gallery option
+                    ElevatedButton(
+                        onClick = {
+                            imagePickerLauncher.launch("image/*")
+                            showImageOptions = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.elevatedButtonColors(
+                            containerColor = CardBackgroundColor,
+                            contentColor = PrimaryColor
+                        ),
+                        elevation = ButtonDefaults.elevatedButtonElevation(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Image,
+                                contentDescription = null,
+                                tint = PrimaryColor
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Choose from Gallery",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Camera option
+                    ElevatedButton(
+                        onClick = {
+                            var shouldLaunchCamera = true
+
+                            // Request camera permission first if needed
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                val hasPermission = context.checkSelfPermission(Manifest.permission.CAMERA) ==
+                                        PackageManager.PERMISSION_GRANTED
+
+                                if (!hasPermission) {
+                                    // Request camera permission
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                    shouldLaunchCamera = false
+                                }
+                            }
+
+                            // Only proceed if we should launch camera
+                            if (shouldLaunchCamera) {
+                                try {
+                                    val photoUri = createImageUri()
+                                    if (photoUri != null) {
+                                        tempImageUri = photoUri
+                                        Log.d("RegisterScreen", "Launching camera with URI: $photoUri")
+                                        cameraLauncher.launch(photoUri)
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Failed to create image file",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("RegisterScreen", "Error launching camera: ${e.message}", e)
+                                    Toast.makeText(
+                                        context,
+                                        "Camera error: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+
+                            showImageOptions = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.elevatedButtonColors(
+                            containerColor = CardBackgroundColor,
+                            contentColor = PrimaryColor
+                        ),
+                        elevation = ButtonDefaults.elevatedButtonElevation(4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoCamera,
+                                contentDescription = null,
+                                tint = PrimaryColor
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Take a Photo",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Image preview dialog
+    if (showPreviewDialog && tempImageUri != null) {
+        Dialog(onDismissRequest = {
+            showPreviewDialog = false
+            tempImageUri = null // Clear temporary URI if cancelled
+            registerViewModel.clearPhotoAnalysisFeedback()
+            showPhotoTip = false
+        }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBackgroundColor),
+                elevation = CardDefaults.cardElevation(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Profile Picture Preview",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryColor
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
                     Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier
+                            .size(300.dp)
+                            .aspectRatio(1f)
+                            .clip(CircleShape)
+                            .shadow(8.dp, CircleShape)
                     ) {
                         Image(
                             painter = rememberAsyncImagePainter(tempImageUri),
-                            contentDescription = "Selected Image",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            contentDescription = "Profile Preview",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
 
                         if (photoAnalysisFeedback == null && !isAnalyzingPhoto && !showPhotoTip) {
-                            // כפתור מנורה להפעלת ניתוח התמונה
                             FloatingActionButton(
                                 onClick = {
                                     tempImageUri?.let {
@@ -291,7 +374,7 @@ fun RegisterScreen(
                                     .align(Alignment.BottomEnd)
                                     .padding(16.dp)
                                     .size(48.dp),
-                                containerColor = Color(0xFF6366F1)
+                                containerColor = PrimaryColor
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Lightbulb,
@@ -302,296 +385,584 @@ fun RegisterScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // הצגת הטיפ אם יש צורך
+                    // Show photo analysis feedback if available
                     if (showPhotoTip) {
-                        ProfilePhotoAnalysisTip(
-                            tip = photoAnalysisFeedback ?: "", // הוספת הניהול של null
-                            isLoading = isAnalyzingPhoto,
-                            onDismiss = {
-                                showPhotoTip = false
-                                registerViewModel.clearPhotoAnalysisFeedback()
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFF0F4FF)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Lightbulb,
+                                            contentDescription = null,
+                                            tint = PrimaryColor
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Photo Analysis",
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimaryColor
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            showPhotoTip = false
+                                            registerViewModel.clearPhotoAnalysisFeedback()
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = TextSecondaryColor
+                                        )
+                                    }
+                                }
+
+                                if (isAnalyzingPhoto) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = PrimaryColor,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(text = "Analyzing your photo...")
+                                    }
+                                } else {
+                                    Text(
+                                        text = photoAnalysisFeedback ?: "",
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        color = TextPrimaryColor
+                                    )
+                                }
                             }
-                        )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                tempImageUri = null
+                                showPreviewDialog = false
+                                registerViewModel.clearPhotoAnalysisFeedback()
+                                showPhotoTip = false
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = TextSecondaryColor
+                            )
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                registerViewModel.imageUri.value = tempImageUri
+                                showPreviewDialog = false
+                                registerViewModel.clearPhotoAnalysisFeedback()
+                                showPhotoTip = false
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryColor
+                            )
+                        ) {
+                            Text(
+                                text = "Use Photo",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // Save the image URI to the ViewModel
-                        registerViewModel.imageUri.value = tempImageUri
-                        showPreviewDialog = false
-                        registerViewModel.clearPhotoAnalysisFeedback()
-                        showPhotoTip = false
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(text = "Use Photo", fontSize = 18.sp)
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = {
-                        tempImageUri = null
-                        showPreviewDialog = false
-                        registerViewModel.clearPhotoAnalysisFeedback()
-                        showPhotoTip = false
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Gray
-                    )
-                ) {
-                    Text(text = "Cancel", fontSize = 18.sp)
-                }
             }
-        )
+        }
     }
 
+    // Main Screen Content
     Surface(
-        color = Color.White,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(28.dp)
+        modifier = Modifier.fillMaxSize(),
+        color = BackgroundColor
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .padding(bottom = 16.dp)
         ) {
-            NormalTextComponent(value = "Hello there,")
-            HeadingTextComponent(value = "Create an Account")
-            Spacer(modifier = Modifier.height(25.dp))
+            // Header with welcome text
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 40.dp, start = 24.dp, end = 24.dp)
+            ) {
+                Column {
 
-            Column {
-                // Basic info fields
-                MyTextFieldComponent(
-                    labelValue = "First Name",
-                    icon = Icons.Outlined.Person,
-                    value = firstName,
-                    onValueChange = { registerViewModel.firstName.value = it }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                MyTextFieldComponent(
-                    labelValue = "Last Name",
-                    icon = Icons.Outlined.Person,
-                    value = lastName,
-                    onValueChange = { registerViewModel.lastName.value = it }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                MyTextFieldComponent(
-                    labelValue = "Email",
-                    icon = Icons.Outlined.Email,
-                    value = email,
-                    onValueChange = { registerViewModel.email.value = it }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                PasswordTextFieldComponent(
-                    labelValue = "Password",
-                    icon = Icons.Outlined.Lock,
-                    value = password,
-                    onValueChange = { registerViewModel.password.value = it }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Date of birth field
-                DatePickerField(
-                    label = "Date of Birth",
-                    value = dob,
-                    onClick = { showDatePicker() }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // "I work as" field - now right after Date of Birth
-                MyTextFieldComponent(
-                    labelValue = "I work as",
-                    icon = Icons.Outlined.Work,
-                    value = occupation,
-                    onValueChange = { registerViewModel.occupation.value = it }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // About Me field - now appears right after "I work as"
-                MyTextFieldComponent(
-                    labelValue = "About Me",
-                    icon = Icons.Outlined.Person,
-                    value = aboutMe,
-                    onValueChange = { registerViewModel.aboutMe.value = it },
-                    singleLine = false,
-                    maxLines = 5
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Profile picture upload - Modern styled button
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showImageOptions = true }
-                        .padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF5F5F5)
+                    Text(
+                        text = "Create an Account",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryColor
                     )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "Profile Picture",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color(0xFF4A148C)
-                            )
-                            Text(
-                                text = if (imageUri != null) "Change your photo" else "Upload a photo of yourself",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .background(
-                                    color = Color(0xFF6F75E8),
-                                    shape = RoundedCornerShape(percent = 50)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = "Upload photo",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
                 }
+            }
 
-                // Show selected image if available
-                if (imageUri != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Card(
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Profile Photo in center
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                ) {
+                    // Profile image with shadow
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                            .fillMaxSize()
+                            .shadow(10.dp, CircleShape)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable { showImageOptions = true },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        if (imageUri != null) {
                             Image(
                                 painter = rememberAsyncImagePainter(imageUri),
                                 contentDescription = "Profile Picture",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                            )
-
-                            // Overlay edit button
-                            Box(
                                 modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(16.dp)
-                                    .size(36.dp)
-                                    .background(
-                                        color = Color(0xFF6F75E8),
-                                        shape = RoundedCornerShape(percent = 50)
-                                    )
-                                    .clickable { showImageOptions = true },
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .padding(4.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Change photo",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.Default.AddAPhoto,
+                                    contentDescription = "Add Photo",
+                                    modifier = Modifier.size(40.dp),
+                                    tint = PrimaryColor
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Add Photo",
+                                    color = PrimaryColor,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
                     }
+
+                    // Edit icon if image exists
+                    if (imageUri != null) {
+                        IconButton(
+                            onClick = { showImageOptions = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 8.dp, y = 8.dp)
+                                .shadow(6.dp, CircleShape)
+                                .background(
+                                    color = SecondaryColor,
+                                    shape = CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Change Profile Picture",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(20.dp))
+            // Form Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 8.dp)
+            ) {
+                // Personal Information
+                Text(
+                    text = "Personal Information",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryColor,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
 
-                // Interests selection card
+                // First Name
+                ModernTextField(
+                    value = firstName,
+                    onValueChange = { registerViewModel.firstName.value = it },
+                    label = "First Name",
+                    icon = Icons.Outlined.Person
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Last Name
+                ModernTextField(
+                    value = lastName,
+                    onValueChange = { registerViewModel.lastName.value = it },
+                    label = "Last Name",
+                    icon = Icons.Outlined.Person
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Email
+                ModernTextField(
+                    value = email,
+                    onValueChange = { registerViewModel.email.value = it },
+                    label = "Email",
+                    icon = Icons.Outlined.Email
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Password - Using ModernTextField instead of custom implementation
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { navController.navigate("hobby_selection") },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Select Your Interests",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            if (selectedHobbies.isNotEmpty()) {
-                                Text(
-                                    text = "${selectedHobbies.size} interests selected",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF4A148C)
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = PrimaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
 
-                        if (selectedHobbies.isEmpty()) {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = "Add interests",
-                                tint = Color(0xFF4A148C)
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "Password",
+                                fontSize = 12.sp,
+                                color = TextSecondaryColor
                             )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = "Interests selected",
-                                tint = Color(0xFF4CAF50)
+
+                            BasicTextField(
+                                value = password,
+                                onValueChange = { registerViewModel.password.value = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = TextPrimaryColor,
+                                    fontSize = 16.sp
+                                ),
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                CheckboxComponent()
+                // Date of Birth
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp))
+                        .clickable { showDatePicker() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarToday,
+                            contentDescription = null,
+                            tint = PrimaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
 
-                BottomComponent(
-                    textQuery = "Already have an account? ",
-                    textClickable = "Login",
-                    action = "Register",
-                    navController = navController,
-                    onActionClick = {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Date of Birth",
+                                fontSize = 12.sp,
+                                color = TextSecondaryColor
+                            )
+                            Text(
+                                text = if (dob.isNotEmpty()) dob else "Select date",
+                                fontSize = 16.sp,
+                                color = if (dob.isNotEmpty()) TextPrimaryColor else TextSecondaryColor,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+
+                        // Removed duplicate calendar icon
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Occupation
+                ModernTextField(
+                    value = occupation,
+                    onValueChange = { registerViewModel.occupation.value = it },
+                    label = "I work as",
+                    icon = Icons.Outlined.Work
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // About Me
+                Text(
+                    text = "About Me",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryColor,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    OutlinedTextField(
+                        value = aboutMe,
+                        onValueChange = { registerViewModel.aboutMe.value = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        placeholder = { Text("Tell us about yourself...") },
+                        minLines = 4,
+                        maxLines = 6,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = CardBackgroundColor,
+                            unfocusedContainerColor = CardBackgroundColor
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Gender Interest Selector
+                Text(
+                    text = "Dating Preferences",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryColor,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "I am interested in",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimaryColor,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        GenderInterestSelector(
+                            selectedGender = genderInterest,
+                            onGenderSelected = { registerViewModel.genderInterest.value = it }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Interests section
+                Text(
+                    text = "Interests",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryColor,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp))
+                        .clickable { navController.navigate("hobby_selection") },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        // Interests header with edit button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Select Your Interests",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextPrimaryColor
+                            )
+
+                            Icon(
+                                imageVector = if (selectedHobbies.isEmpty()) Icons.Default.Add else Icons.Default.Check,
+                                contentDescription = if (selectedHobbies.isEmpty()) "Add interests" else "Interests selected",
+                                tint = if (selectedHobbies.isEmpty()) PrimaryColor else Color(0xFF4CAF50)
+                            )
+                        }
+
+                        // Display selected hobbies or placeholder
+                        if (selectedHobbies.isNotEmpty()) {
+                            // Using a FlowRow-like arrangement with multiple rows as needed
+                            selectedHobbies.chunked(3).forEachIndexed { index, rowHobbies ->
+                                if (index > 0) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowHobbies.forEach { hobby ->
+                                        InterestChip(
+                                            hobby = hobby,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+
+                                    // Fill empty spaces if needed
+                                    repeat(3 - rowHobbies.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "Tap to select your interests",
+                                fontSize = 14.sp,
+                                color = TextSecondaryColor,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Terms and Conditions
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = true, // You can make this stateful if needed
+                        onCheckedChange = { },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = PrimaryColor
+                        )
+                    )
+
+                    Text(
+                        text = "By signing up, you agree to our Terms of Service and Privacy Policy",
+                        fontSize = 12.sp,
+                        color = TextSecondaryColor,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Register Button
+                Button(
+                    onClick = {
                         if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || password.isBlank() || dob.isBlank()) {
-                            Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                         } else if (selectedHobbies.isEmpty()) {
                             Toast.makeText(context, "Please select at least one interest", Toast.LENGTH_SHORT).show()
                             navController.navigate("hobby_selection")
+                        } else if (genderInterest.isBlank()) {
+                            Toast.makeText(context, "Please select who you're interested in", Toast.LENGTH_SHORT).show()
                         } else {
                             registerViewModel.registerUser(
                                 firstName = firstName,
@@ -602,12 +973,148 @@ fun RegisterScreen(
                                 imageUri = imageUri,
                                 aboutMe = aboutMe,
                                 occupation = occupation,
+                                genderInterest = genderInterest,
                                 hobbies = selectedHobbies
                             )
                         }
-                    }
-                )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .shadow(8.dp, RoundedCornerShape(28.dp)),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SecondaryColor
+                    )
+                ) {
+                    Text(
+                        text = "Create Account",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Already have an account
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Already have an account? ",
+                        fontSize = 14.sp,
+                        color = TextSecondaryColor
+                    )
+
+                    Text(
+                        text = "Login",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryColor,
+                        modifier = Modifier.clickable {
+                            navController.navigate("login") {
+                                popUpTo("register") { inclusive = true }
+                            }
+                        }
+                    )
+                }
             }
         }
     }
+}
+
+// InterestChip matches the HobbySelectionDialog style
+@Composable
+fun InterestChip(
+    hobby: String,
+    modifier: Modifier = Modifier
+) {
+    // Convert the hobby string to a HobbyItem for consistent styling
+    val hobbyItem = getHobbyItemForName(hobby)
+
+    val backgroundColor = hobbyItem.color
+    val borderColor = hobbyItem.color
+    val textColor = Color.Black
+    val iconColor = Color.Black
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(backgroundColor)
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = hobbyItem.icon,
+            contentDescription = hobbyItem.name,
+            tint = iconColor,
+            modifier = Modifier.size(16.dp)
+        )
+
+        Text(
+            text = hobbyItem.name,
+            color = textColor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 14.sp
+        )
+    }
+}
+
+// Function to match hobby string to HobbyItem
+fun getHobbyItemForName(hobbyName: String): HobbyItem {
+    val hobbies = listOf(
+        HobbyItem("gaming", "Gaming", Icons.Filled.SportsEsports, Color(0xFFE0E0E0)),
+        HobbyItem("dancing", "Dancing", Icons.Filled.MusicNote, Color(0xFFFFEBEE)),
+        HobbyItem("language", "Language", Icons.Filled.Translate, Color(0xFFE0F7FA)),
+        HobbyItem("music", "Music", Icons.Filled.MusicNote, Color(0xFFE1BEE7)),
+        HobbyItem("movie", "Movie", Icons.Filled.Movie, Color(0xFFF8BBD0)),
+        HobbyItem("photography", "Photography", Icons.Filled.PhotoCamera, Color(0xFFE0E0E0)),
+        HobbyItem("architecture", "Architecture", Icons.Filled.Architecture, Color(0xFFE0E0E0)),
+        HobbyItem("fashion", "Fashion", Icons.Filled.Checkroom, Color(0xFFF8BBD0)),
+        HobbyItem("book", "Book", Icons.Filled.MenuBook, Color(0xFFE1BEE7)),
+        HobbyItem("writing", "Writing", Icons.Filled.Create, Color(0xFFE0E0E0)),
+        HobbyItem("nature", "Nature", Icons.Filled.Park, Color(0xFFDCEDC8)),
+        HobbyItem("painting", "Painting", Icons.Filled.Palette, Color(0xFFFFF9C4)),
+        HobbyItem("football", "Football", Icons.Filled.SportsSoccer, Color(0xFFE0E0E0)),
+        HobbyItem("people", "People", Icons.Filled.People, Color(0xFFFFF9C4)),
+        HobbyItem("animals", "Animals", Icons.Filled.Pets, Color(0xFFE1BEE7)),
+        HobbyItem("fitness", "Gym & Fitness", Icons.Filled.FitnessCenter, Color(0xFFFFF9C4)),
+        // Fallback for other hobbies
+        HobbyItem("travel", "Travel", Icons.Filled.Flight, Color(0xFFDCEDC8)),
+        HobbyItem("food", "Food", Icons.Filled.Restaurant, Color(0xFFE0F7FA)),
+        HobbyItem("cooking", "Cooking", Icons.Filled.Fastfood, Color(0xFFFFEBEE)),
+        HobbyItem("technology", "Technology", Icons.Filled.Devices, Color(0xFFE0E0E0))
+    )
+
+    // Try to find exact match
+    val exactMatch = hobbies.find { it.id.equals(hobbyName.lowercase()) || it.name.equals(hobbyName, ignoreCase = true) }
+    if (exactMatch != null) {
+        return exactMatch
+    }
+
+    // If no exact match, try partial match
+    val partialMatch = hobbies.find {
+        hobbyName.lowercase().contains(it.id) ||
+                it.id.contains(hobbyName.lowercase()) ||
+                hobbyName.lowercase().contains(it.name.lowercase()) ||
+                it.name.lowercase().contains(hobbyName.lowercase())
+    }
+    if (partialMatch != null) {
+        return partialMatch.copy(name = hobbyName)  // Use the original hobby name but keep the icon/color
+    }
+
+    // Default fallback
+    return HobbyItem(
+        hobbyName.lowercase(),
+        hobbyName,
+        Icons.Filled.Star,
+        Color(0xFFE0E0E0)
+    )
 }
