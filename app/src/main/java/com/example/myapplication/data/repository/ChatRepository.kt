@@ -172,45 +172,60 @@ class ChatRepository {
         return socketManager.isConnected()
     }
 
-    // Helper methods to update local state
     private fun updateChatWithNewMessage(messageResponse: MessageResponse) {
-        // Update current chat if it matches
-        var currentChat = _currentChat.value
-        Log.d(TAG, "Updating chat with new message")
-        Log.d(TAG, "Current chat matchId: '${currentChat?.matchId}'")
-        Log.d(TAG, "Message response matchId: '${messageResponse.matchId}'")
-        Log.d(TAG, "Match IDs equal: ${currentChat?.matchId == messageResponse.matchId}")
+        Log.d(TAG, "=== UPDATING CHAT WITH NEW MESSAGE ===")
+        Log.d(TAG, "Message matchId: '${messageResponse.matchId}'")
+        Log.d(TAG, "Message content: ${messageResponse.message.content}")
+        Log.d(TAG, "Message sender: ${messageResponse.message.sender}")
 
-        // If current chat is null, try to find it in the chats list
-        if (currentChat == null) {
-            Log.d(TAG, "Current chat is null, searching in chats list")
-            val foundChat = _chats.value.find { it.matchId == messageResponse.matchId }
-            if (foundChat != null) {
-                Log.d(TAG, "Found chat in list, setting as current chat")
-                currentChat = foundChat
-                _currentChat.value = foundChat
-            } else {
-                Log.d(TAG, "Chat not found in list either")
-                return
+        // תמיד חפש את השיחה ברשימה, לא משנה מה המצב הנוכחי
+        val currentChats = _chats.value.toMutableList()
+        val chatIndex = currentChats.indexOfFirst { it.matchId == messageResponse.matchId }
+
+        if (chatIndex != -1) {
+            Log.d(TAG, "Found chat in list at index $chatIndex")
+            val existingChat = currentChats[chatIndex]
+
+            // בדוק אם ההודעה כבר קיימת (למנוע כפילויות)
+            val messageExists = existingChat.messages.any {
+                it.content == messageResponse.message.content &&
+                        it.sender == messageResponse.message.sender &&
+                        it.timestamp == messageResponse.message.timestamp
             }
-        }
 
-        if (currentChat.matchId == messageResponse.matchId) {
-            Log.d(TAG, "Match IDs match, updating current chat")
-            val updatedMessages = currentChat.messages + messageResponse.message
-            val updatedChat = currentChat.copy(
-                messages = updatedMessages,
-                lastActivity = messageResponse.message.timestamp
-            )
-            _currentChat.value = updatedChat
-            Log.d(TAG, "Updated current chat, new message count: ${updatedChat.messages.size}")
+            if (!messageExists) {
+                Log.d(TAG, "Message is new, adding to chat")
+                val updatedMessages = existingChat.messages + messageResponse.message
+                val updatedChat = existingChat.copy(
+                    messages = updatedMessages,
+                    lastActivity = messageResponse.message.timestamp
+                )
 
-            // Update the chat in the chats list as well
-            updateChatInList(updatedChat)
+                // עדכון השיחה ברשימה
+                currentChats[chatIndex] = updatedChat
+
+                // מיון לפי פעילות אחרונה (החדש ביותר בראש)
+                currentChats.sortByDescending { it.lastActivity }
+
+                // עדכון State
+                _chats.value = currentChats
+                Log.d(TAG, "Updated chats list, chat moved to position: ${currentChats.indexOfFirst { it.id == updatedChat.id }}")
+
+                // אם זו השיחה הפתוחה כרגע, עדכן גם אותה
+                if (_currentChat.value?.matchId == messageResponse.matchId) {
+                    Log.d(TAG, "Also updating current chat")
+                    _currentChat.value = updatedChat
+                }
+            } else {
+                Log.d(TAG, "Message already exists, skipping")
+            }
         } else {
-            Log.d(TAG, "Match IDs don't match, not updating current chat")
-            // Let's also check if we need to find the chat by match ID
-            Log.d(TAG, "Available chats: ${_chats.value.map { "matchId: '${it.matchId}'" }}")
+            Log.d(TAG, "Chat not found in list!")
+            Log.d(TAG, "Available chats: ${currentChats.map { "matchId: '${it.matchId}'" }}")
+
+            // אם השיחה לא נמצאת ברשימה, נסה לטעון אותה מחדש
+            // זה יכול לקרות אם המשתמש קיבל הודעה לשיחה שעדיין לא נטענה
+            Log.d(TAG, "Chat not in list, might need to refresh chats")
         }
     }
 
