@@ -45,6 +45,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.model.User
 import com.example.myapplication.ui.hobbies.HobbyViewModel
 import com.example.myapplication.ui.components.GenderInterestSelector
+import com.example.myapplication.ui.components.GenderSelector
 
 // Define theme colors
 val PrimaryColor = Color(0xFF6F75E8)
@@ -120,7 +121,21 @@ fun EditProfileScreen(
             else user.genderInterest ?: ""
         )
     }
-
+    var gender by rememberSaveable {
+        mutableStateOf(
+            if (savedFormState.gender.isNotEmpty()) {
+                Log.d("EditProfileDebug", "Loading gender from savedFormState: '${savedFormState.gender}'")
+                savedFormState.gender
+            } else {
+                Log.d("EditProfileDebug", "Loading gender from user: '${user.gender ?: "null"}'")
+                user.gender ?: "Male"
+            }
+        )
+    }
+// הוסף LaunchedEffect למעקב אחר שינויים במגדר
+    LaunchedEffect(gender) {
+        Log.d("EditProfileDebug", "Gender changed to: '$gender'")
+    }
     // For image handling
     var tempImageUri by rememberSaveable { mutableStateOf<Uri?>(null) } // Temporary URI for preview only
     var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(savedFormState.selectedImageUri) } // Final selected image for display
@@ -154,7 +169,11 @@ fun EditProfileScreen(
                 if (genderInterest.isEmpty() || genderInterest != newUser.genderInterest) {
                     genderInterest = newUser.genderInterest ?: ""
                 }
-
+                if (gender.isEmpty() || gender != newUser.gender) {
+                    val oldGender = gender
+                    gender = newUser.gender ?: "Male"
+                    Log.d("EditProfileDebug", "Gender updated from '$oldGender' to '$gender'")
+                }
                 // Update avatar URL if changed
                 if (currentAvatarUrl != newUser.avatar) {
                     currentAvatarUrl = newUser.avatar
@@ -633,7 +652,27 @@ fun EditProfileScreen(
                     label = "Occupation",
                     icon = Icons.Outlined.Work
                 )
+                Spacer(modifier = Modifier.height(16.dp))
 
+// Gender Selection
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        GenderSelector(
+                            selectedGender = gender,
+                            onGenderSelected = { gender = it }
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(30.dp))
 
                 // About Me Section
@@ -749,7 +788,8 @@ fun EditProfileScreen(
                                         about = about,
                                         occupation = occupation,
                                         selectedImageUri = selectedImageUri,
-                                        genderInterest = genderInterest  // Add gender interest to saved form state
+                                        genderInterest = genderInterest  ,// Add gender interest to saved form state
+                                        gender = gender
                                     )
 
                                     navController.navigate("hobby_selection") {
@@ -820,7 +860,8 @@ fun EditProfileScreen(
                                 about = about,
                                 occupation = occupation,
                                 hobbies = selectedHobbies,
-                                genderInterest = genderInterest  // Add gender interest to updated user
+                                genderInterest = genderInterest , // Add gender interest to updated user
+                                gender = gender
                             ),
                             imageUri = selectedImageUri,
                             onSuccess = {

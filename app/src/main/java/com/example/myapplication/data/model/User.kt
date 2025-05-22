@@ -10,5 +10,6 @@ data class User(
     val occupation: String? = null,
     val about: String? = null,
     val genderInterest: String,
-    val hobbies: List<String>? = emptyList()
+    val hobbies: List<String>? = emptyList(),
+    val gender: String? = null
 )
