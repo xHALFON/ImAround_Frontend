@@ -87,7 +87,9 @@ fun AppNavHost(
         composable("search") {
             SearchScreen(navController)
         }
-
+        composable("main_with_chat") {
+            MainScreen(navController, startWithChatTab = true)
+        }
         // Add new chat screens
         composable("chat_list") {
             ChatListScreen(
