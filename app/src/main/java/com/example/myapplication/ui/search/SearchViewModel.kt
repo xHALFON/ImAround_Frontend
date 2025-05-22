@@ -32,7 +32,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val sessionManager = SessionManager(application)
     private val backendApi = BackendApi()
     private val socketManager = SocketManager.getInstance()
-
+    val newMatchId = MutableLiveData<String?>()
     // שימוש ב-RetrofitClient הקיים
     private val searchService = RetrofitClient.searchService
     private val matchingService = RetrofitClient.matchingService
@@ -207,6 +207,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     // IMPORTANT: Always show match notification for confirmed matches
                     Log.d("SocketManager", "Showing match notification for: ${userData.firstName}")
                     _newMatchUser.postValue(userData)
+                    newMatchId.postValue(matchData._id)
                     _hasNewMatch.postValue(true)
                 } else {
 
@@ -244,6 +245,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                                 // Show match notification with the fetched user data
                                 Log.d("SocketManager", "Showing match notification for fetched user: ${userFromServer.firstName}")
                                 _newMatchUser.postValue(userFromServer)
+
                                 _hasNewMatch.postValue(true)
                             } else {
                                 Log.e("SocketManager", "User not found on server for ID: $otherUserId")
@@ -391,6 +393,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
                     // הפעלת התראת מאצ'
                     _newMatchUser.postValue(userData)
+                    newMatchId.postValue(response.matchDetails._id) //
                     _hasNewMatch.postValue(true)
                     removeUserFromRadar(targetUserId)
                 }
@@ -431,6 +434,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     fun clearNewMatchFlag() {
         _hasNewMatch.postValue(false)
         _newMatchUser.postValue(null)
+        newMatchId.postValue(null)
     }
 
     // התחלת חיפוש משתמשים בקרבת מקום

@@ -49,7 +49,7 @@ sealed class BottomNavItem(val route: String, val icon: Any, val label: String) 
 }
 
 @Composable
-fun MainScreen(navController: NavHostController) {
+fun MainScreen(navController: NavHostController, startWithChatTab: Boolean = false) {
     val items = listOf(
         BottomNavItem.Chat,
         BottomNavItem.Scan,
@@ -60,6 +60,17 @@ fun MainScreen(navController: NavHostController) {
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    LaunchedEffect(startWithChatTab) {
+        if (startWithChatTab) {
+            bottomNavController.navigate(BottomNavItem.Chat.route) {
+                popUpTo(bottomNavController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
     Scaffold(
         bottomBar = {
             Box(

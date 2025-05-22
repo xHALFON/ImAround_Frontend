@@ -5,8 +5,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -69,7 +69,7 @@ fun SearchScreen(
     var showMatchesList by remember { mutableStateOf(false) }
     var selectedMatch by remember { mutableStateOf<UserMatch?>(null) }
     var showMatchConfirmation by remember { mutableStateOf(false) }
-
+    val newMatchId by viewModel.newMatchId.observeAsState()
     // Match confirmed animation
     LaunchedEffect(hasNewMatch) {
         if (hasNewMatch && newMatchUser != null) {
@@ -105,11 +105,11 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(error) {
-        error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-        }
-    }
+//    LaunchedEffect(error) {
+//        error?.let {
+//            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+//        }
+//    }
 
     Box(modifier = Modifier
         .fillMaxSize()
@@ -276,8 +276,16 @@ fun SearchScreen(
                 onAnimationComplete = {
                     showMatchConfirmation = false
                     viewModel.clearNewMatchFlag()
-                    // Navigate to chat with the matched user
-                    // navController.navigate("chat/${newMatchUser?.id}")
+                },
+                onGoToChat = {
+                    showMatchConfirmation = false
+                    viewModel.clearNewMatchFlag()
+                    navController.navigate("main_with_chat")
+                },
+                onClose = {
+                    // סגירת המסך וחזרה לחיפוש
+                    showMatchConfirmation = false
+                    viewModel.clearNewMatchFlag()
                 }
             )
         }
@@ -847,13 +855,16 @@ fun SwipeableMatchCard(
 @Composable
 fun MatchConfirmationAnimation(
     matchedUser: UserResponse?,
-    onAnimationComplete: () -> Unit
+    onAnimationComplete: () -> Unit,
+    onGoToChat: () -> Unit = {},  // חדש - פונקציה לעבור לצ'אט
+    onClose: () -> Unit = {}      // חדש - פונקציה לסגור את המסך
 ) {
     // Track animation progress
     var animationProgress by remember { mutableStateOf(0f) }
+    var animationCompleted by remember { mutableStateOf(false) }
 
     // Animation timing
-    val animationDuration = 3000 // 3 seconds total
+    val animationDuration = 2000 // קיצרתי ל-2 שניות
 
     // Launch animation
     LaunchedEffect(matchedUser) {
@@ -864,7 +875,8 @@ fun MatchConfirmationAnimation(
                     (System.currentTimeMillis() - startTime).toFloat() / animationDuration
                 delay(16) // ~60fps
             }
-            onAnimationComplete()
+            animationCompleted = true // סימון שהאנימציה הסתיימה
+            // לא קוראים ל-onAnimationComplete אוטומטית יותר
         }
     }
 
@@ -879,6 +891,37 @@ fun MatchConfirmationAnimation(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
+            // X button בפינה הימנית העליונה
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    onClick = {
+                        onClose()
+                        onAnimationComplete() // לנקות את הסטייט
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .alpha(
+                            animateFloatAsState(
+                                targetValue = if (animationProgress > 0.3f) 1f else 0f
+                            ).value
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             // Hearts animation around the avatars
             Box(
                 modifier = Modifier.size(200.dp),
@@ -896,9 +939,10 @@ fun MatchConfirmationAnimation(
                     )
 
                     val animatedAlpha by animateFloatAsState(
-                        targetValue = if (animationProgress > delay)
-                            1f - ((animationProgress - delay) * 1.5f).coerceIn(0f, 1f)
-                        else 0f
+                        targetValue = if (animationProgress > delay) {
+                            if (animationCompleted) 0.8f // שמירה על שקיפות קבועה אחרי האנימציה
+                            else 1f - ((animationProgress - delay) * 1.5f).coerceIn(0f, 1f)
+                        } else 0f
                     )
 
                     val angle = index * 45f
@@ -994,33 +1038,74 @@ fun MatchConfirmationAnimation(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Start messaging button
-            Button(
-                onClick = onAnimationComplete,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(
-                        animateFloatAsState(
-                            targetValue = if (animationProgress > 0.8f) 1f else 0f
-                        ).value
-                    ),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color(0xFF1976D2)
-                ),
-                shape = RoundedCornerShape(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Message,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Start Messaging",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
+            // כפתורים - יופיעו רק אחרי שהאנימציה תסתיים
+            if (animationCompleted) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Start messaging button
+                    Button(
+                        onClick = {
+                            onGoToChat()
+                            onAnimationComplete() // לנקות את הסטייט
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color(0xFF1976D2)
+                        ),
+                        shape = RoundedCornerShape(28.dp),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Message,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Start Messaging",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+
+                    // Keep searching button
+                    OutlinedButton(
+                        onClick = {
+                            onClose()
+                            onAnimationComplete() // לנקות את הסטייט
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.White,
+                            containerColor = Color.Transparent
+                        ),
+                        border = BorderStroke(2.dp, Color.White),
+                        shape = RoundedCornerShape(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Keep Searching",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+                }
             }
         }
     }
