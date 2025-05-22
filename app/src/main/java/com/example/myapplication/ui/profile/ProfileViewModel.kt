@@ -25,6 +25,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val userProfile = MutableLiveData<User>()
     val errorMessage = MutableLiveData<String>()
     val logoutSuccess = MutableLiveData<Boolean>()
+    // Add state for delete account
+    val deleteAccountSuccess = MutableLiveData<Boolean>()
 
     // Form state management
     private val _formState = MutableStateFlow(FormState())
@@ -94,6 +96,42 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Deletes the user account
+     */
+    fun deleteAccount() {
+        val userId = sessionManager.getUserId()
+
+        if (userId == null) {
+            errorMessage.postValue("User ID not found in session")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Call your API to delete the user account
+                val response = RetrofitClient.authService.deleteUser(userId)
+
+                if (response.isSuccessful) {
+                    // Clear local session data
+                    sessionManager.clearSession()
+                    Log.d("ProfileViewModel", "User account deleted and session cleared")
+
+                    // Notify UI about successful deletion
+                    deleteAccountSuccess.postValue(true)
+                } else {
+                    Log.e("ProfileViewModel", "Delete account failed: ${response.errorBody()?.string()}")
+                    errorMessage.postValue("Failed to delete account")
+                    deleteAccountSuccess.postValue(false)
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Delete account error: ${e.message}")
+                errorMessage.postValue(e.localizedMessage ?: "Error deleting account")
+                deleteAccountSuccess.postValue(false)
+            }
+        }
+    }
+
     private suspend fun uploadImageToCloudinary(imageUri: Uri): String? {
         return try {
             val contentResolver = getApplication<Application>().contentResolver
@@ -126,7 +164,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         email: String,
         about: String,
         occupation: String,
-        selectedImageUri: Uri?
+        selectedImageUri: Uri?,
+        genderInterest: String = ""  // Added genderInterest parameter
     ) {
         _formState.value = FormState(
             firstName = firstName,
@@ -134,9 +173,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             email = email,
             about = about,
             occupation = occupation,
-            selectedImageUri = selectedImageUri
+            selectedImageUri = selectedImageUri,
+            genderInterest = genderInterest  // Added to form state
         )
-        Log.d("ProfileViewModel", "Form state saved: firstName=$firstName, lastName=$lastName")
+        Log.d("ProfileViewModel", "Form state saved: firstName=$firstName, lastName=$lastName, genderInterest=$genderInterest")
     }
 
     /**
@@ -181,7 +221,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Data class to hold form state
+     * Data class to hold form state - Updated to include genderInterest
      */
     data class FormState(
         val firstName: String = "",
@@ -189,8 +229,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val email: String = "",
         val about: String = "",
         val occupation: String = "",
-        val selectedImageUri: Uri? = null
+        val selectedImageUri: Uri? = null,
+        val genderInterest: String = ""  // Added genderInterest field
     )
+
     /**
      * Clears the saved form state after a successful update
      */

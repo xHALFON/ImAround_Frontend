@@ -9,5 +9,6 @@ data class User(
     val avatar: String,
     val occupation: String? = null,
     val about: String? = null,
+    val genderInterest: String,
     val hobbies: List<String>? = emptyList()
 )

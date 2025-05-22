@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -28,6 +29,8 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -64,6 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.myapplication.R
+import com.example.myapplication.ui.profile.CardBackgroundColor
+import com.example.myapplication.ui.profile.PrimaryColor
+import com.example.myapplication.ui.profile.TextPrimaryColor
+import com.example.myapplication.ui.profile.TextSecondaryColor
 import com.example.myapplication.ui.theme.AccentColor
 import com.example.myapplication.ui.theme.GrayColor
 import com.example.myapplication.ui.theme.Secondary
@@ -201,6 +209,65 @@ fun CheckboxComponent() {
             }
         )
         ClickableTextComponent()
+    }
+}
+@Composable
+fun ModernTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    icon: ImageVector,
+    enabled: Boolean = true,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (enabled) PrimaryColor else TextSecondaryColor.copy(alpha = 0.5f),
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    color = if (enabled) TextSecondaryColor else TextSecondaryColor.copy(alpha = 0.5f)
+                )
+
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = if (enabled) TextPrimaryColor else TextSecondaryColor.copy(alpha = 0.7f),
+                        fontSize = 16.sp
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType)
+                )
+            }
+        }
     }
 }
 
