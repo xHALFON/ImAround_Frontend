@@ -3,9 +3,12 @@ package com.example.myapplication.ui.chat
 import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,15 +23,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
+
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -46,7 +53,7 @@ import com.example.myapplication.data.local.SessionManager
 import com.example.myapplication.data.model.Message
 import com.example.myapplication.data.model.UserResponse
 import kotlinx.coroutines.delay
-import kotlin.math.sin
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -382,102 +389,6 @@ fun ChatDetailScreen(
 }
 
 @Composable
-private fun AnimatedLightBulbButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var isPressed by remember { mutableStateOf(false) }
-    var isGlowing by remember { mutableStateOf(false) }
-
-    // אנימציה של הזוהר
-    LaunchedEffect(Unit) {
-        while (true) {
-            isGlowing = true
-            delay(2000)
-            isGlowing = false
-            delay(3000)
-        }
-    }
-
-    // אנימציות צבע
-    val glowColor by animateColorAsState(
-        targetValue = if (isGlowing) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary,
-        animationSpec = tween(1000, easing = EaseInOutSine),
-        label = "glow_color"
-    )
-
-    // אנימציית סקייל כשלוחצים
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.9f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "scale"
-    )
-
-    // אנימציית רוטציה עדינה
-    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-
-    Box(
-        modifier = modifier
-            .size(56.dp)
-            .scale(scale)
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        glowColor.copy(alpha = 0.3f),
-                        glowColor.copy(alpha = 0.1f),
-                        Color.Transparent
-                    ),
-                    radius = 80f
-                ),
-                shape = CircleShape
-            )
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        glowColor.copy(alpha = 0.8f),
-                        glowColor
-                    )
-                ),
-                shape = CircleShape
-            )
-            .clickable {
-                isPressed = true
-                onClick()
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Lightbulb,
-            contentDescription = "Get chat tips",
-            tint = Color.White,
-            modifier = Modifier
-                .size(28.dp)
-                .graphicsLayer {
-                    // רוטציה עדינה אם זוהר
-                    rotationZ = if (isGlowing) sin(rotation * 0.01f) * 5f else 0f
-                }
-        )
-    }
-
-    // טיפול באירועי לחיצה
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            delay(100)
-            isPressed = false
-        }
-    }
-}
-
-@Composable
 private fun EnhancedChatTipsDialog(
     tips: List<String>,
     isLoading: Boolean,
@@ -485,161 +396,76 @@ private fun EnhancedChatTipsDialog(
     onDismiss: () -> Unit
 ) {
     var isVisible by remember { mutableStateOf(false) }
-    var showContent by remember { mutableStateOf(false) }
 
-    // אנימציית כניסה
+    // Entry animation
     LaunchedEffect(Unit) {
         isVisible = true
-        delay(150)
-        showContent = true
     }
 
-    // אנימציות
+    // Animations
     val backdropAlpha by animateFloatAsState(
-        targetValue = if (isVisible) 0.6f else 0f,
+        targetValue = if (isVisible) 0.4f else 0f,
         animationSpec = tween(300),
         label = "backdrop"
     )
 
-    val dialogScale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.8f,
+    val dialogOffset by animateIntAsState(
+        targetValue = if (isVisible) 0 else 100,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
-        label = "dialog_scale"
+        label = "dialog_offset"
     )
 
-    val contentAlpha by animateFloatAsState(
-        targetValue = if (showContent) 1f else 0f,
-        animationSpec = tween(300, delayMillis = 150),
-        label = "content_alpha"
+    val dialogAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(400, easing = EaseOutCubic),
+        label = "dialog_alpha"
     )
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
         )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = backdropAlpha))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
+                .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .heightIn(max = 500.dp)
-                    .scale(dialogScale)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { /* למנוע סגירה כשלוחצים על הדיאלוג */ }
-                    ),
-                shape = RoundedCornerShape(24.dp),
+                    .fillMaxWidth()
+                    .heightIn(max = 600.dp)
+                    .offset(y = dialogOffset.dp)
+                    .alpha(dialogAlpha),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 24.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .alpha(contentAlpha)
-                ) {
-                    // Header עם gradient
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp)
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFF6366F1),
-                                        Color(0xFF8B5CF6),
-                                        Color(0xFFEC4899)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                            )
-                    ) {
-                        // כפתור סגירה
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                Column {
+                    // Minimalist header
+                    DialogHeader(onDismiss = onDismiss)
 
-                        // כותרת וסמלים
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // אנימציית המנורה
-                            AnimatedLightBulbIcon()
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Text(
-                                text = "Chat Tips",
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    // תוכן הדיאלוג
+                    // Dialog content
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(24.dp)
                     ) {
                         when {
-                            isLoading -> {
-                                LoadingContent()
-                            }
-
-                            error != null -> {
-                                ErrorContent(error = error)
-                            }
-
-                            tips.isNotEmpty() -> {
-                                TipsContent(tips = tips)
-                            }
-
-                            else -> {
-                                EmptyContent()
-                            }
+                            isLoading -> LoadingContent()
+                            error != null -> ErrorContent(error = error)
+                            tips.isNotEmpty() -> TipsContent(tips = tips)
+                            else -> EmptyContent()
                         }
                     }
                 }
@@ -649,41 +475,54 @@ private fun EnhancedChatTipsDialog(
 }
 
 @Composable
-private fun AnimatedLightBulbIcon() {
-    val infiniteTransition = rememberInfiniteTransition(label = "bulb_glow")
-
-    val glowIntensity by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow_intensity"
-    )
-
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotation"
-    )
-
-    Icon(
-        imageVector = Icons.Default.Lightbulb,
-        contentDescription = null,
-        tint = Color.White.copy(alpha = glowIntensity),
+private fun DialogHeader(onDismiss: () -> Unit) {
+    Box(
         modifier = Modifier
-            .size(32.dp)
-            .graphicsLayer {
-                rotationZ = rotation
-                scaleX = 0.9f + (glowIntensity * 0.1f)
-                scaleY = 0.9f + (glowIntensity * 0.1f)
-            }
-    )
+            .fillMaxWidth()
+            .padding(20.dp)
+    ) {
+        // Centered title
+        Row(
+            modifier = Modifier.align(Alignment.Center),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lightbulb,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "Chat Tips",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // Minimalist close button
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(40.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Close",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -691,45 +530,53 @@ private fun LoadingContent() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(40.dp)
     ) {
-        // אנימציית לודינג מותאמת אישית
+        // Minimalist loading animation
         val infiniteTransition = rememberInfiniteTransition(label = "loading")
+
         val rotation by infiniteTransition.animateFloat(
             initialValue = 0f,
             targetValue = 360f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = LinearEasing),
+                animation = tween(1200, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
             label = "loading_rotation"
         )
 
+        val scale by infiniteTransition.animateFloat(
+            initialValue = 0.8f,
+            targetValue = 1.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = EaseInOutSine),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "loading_scale"
+        )
+
+        val primaryColor = MaterialTheme.colorScheme.primary
+
         Box(
             modifier = Modifier
-                .size(60.dp)
-                .background(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.primary,
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-                .graphicsLayer { rotationZ = rotation },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = CircleShape
+                .size(48.dp)
+                .graphicsLayer {
+                    rotationZ = rotation
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .drawBehind {
+                    drawArc(
+                        color = primaryColor,
+                        startAngle = 0f,
+                        sweepAngle = 270f,
+                        useCenter = false,
+                        style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                     )
-            )
-        }
+                }
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -745,9 +592,9 @@ private fun LoadingContent() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "This may take a moment",
+            text = "This will just take a moment",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             textAlign = TextAlign.Center
         )
     }
@@ -758,17 +605,32 @@ private fun ErrorContent(error: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(40.dp)
     ) {
-        Text(
-            text = "⚠️",
-            fontSize = 48.sp
-        )
+        // Minimalist error icon
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(32.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Text(
-            text = "Oops! Something went wrong",
+            text = "Something went wrong",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.SemiBold
             ),
@@ -781,7 +643,7 @@ private fun ErrorContent(error: String) {
         Text(
             text = error,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             textAlign = TextAlign.Center
         )
     }
@@ -790,53 +652,54 @@ private fun ErrorContent(error: String) {
 @Composable
 private fun TipsContent(tips: List<String>) {
     LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         itemsIndexed(tips) { index, tip ->
-            TipCard(tip = tip, index = index)
+            CleanTipCard(tip = tip, index = index)
         }
     }
 }
 
 @Composable
-private fun TipCard(tip: String, index: Int) {
+private fun CleanTipCard(tip: String, index: Int) {
     var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        delay(index * 150L)
+        delay(index * 100L)
         isVisible = true
     }
 
-    val scale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.9f,
+    val offset by animateIntAsState(
+        targetValue = if (isVisible) 0 else 50,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
         ),
-        label = "tip_scale"
+        label = "tip_offset"
     )
 
     val alpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(300),
+        animationSpec = tween(400, delayMillis = index * 50),
         label = "tip_alpha"
     )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
+            .offset(y = offset.dp)
             .alpha(alpha),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = when (index % 3) {
-                0 -> Color(0xFFF0F9FF) // Light blue
-                1 -> Color(0xFFF0FDF4) // Light green
-                else -> Color(0xFFFFFBEB) // Light amber
-            }
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+        )
     ) {
         Row(
             modifier = Modifier
@@ -844,36 +707,32 @@ private fun TipCard(tip: String, index: Int) {
                 .padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // מספר הטיפ
+            // Minimalist tip number
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .background(
-                        color = when (index % 3) {
-                            0 -> Color(0xFF3B82F6)
-                            1 -> Color(0xFF10B981)
-                            else -> Color(0xFFF59E0B)
-                        },
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "${index + 1}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
                     )
                 )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // תוכן הטיפ
+            // Tip content
             Text(
                 text = tip,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    lineHeight = 22.sp
+                    lineHeight = 20.sp
                 ),
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
@@ -881,27 +740,122 @@ private fun TipCard(tip: String, index: Int) {
         }
     }
 }
-
 @Composable
 private fun EmptyContent() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(40.dp)
     ) {
-        Text(
-            text = "🤔",
-            fontSize = 48.sp
-        )
+        // Empty state icon
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lightbulb,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(32.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Text(
-            text = "No tips available right now",
-            style = MaterialTheme.typography.titleMedium,
+            text = "No tips available",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Medium
+            ),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Try again later",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// Clean animated light bulb button
+@Composable
+private fun AnimatedLightBulbButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    var isGlowing by remember { mutableStateOf(false) }
+
+    // Glow animation
+    LaunchedEffect(Unit) {
+        while (true) {
+            isGlowing = true
+            delay(2000)
+            isGlowing = false
+            delay(3000)
+        }
+    }
+
+    // Color animations
+    val glowColor by animateColorAsState(
+        targetValue = if (isGlowing) MaterialTheme.colorScheme.primary else
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+        animationSpec = tween(1000, easing = EaseInOutSine),
+        label = "glow_color"
+    )
+
+    // Scale animation when pressed
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .scale(scale)
+            .background(
+                color = glowColor.copy(alpha = 0.1f),
+                shape = CircleShape
+            )
+            .border(
+                width = 2.dp,
+                color = glowColor.copy(alpha = 0.3f),
+                shape = CircleShape
+            )
+            .clickable {
+                isPressed = true
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Lightbulb,
+            contentDescription = "Get chat tips",
+            tint = glowColor,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+
+    // Handle press events
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(100)
+            isPressed = false
+        }
     }
 }
 
