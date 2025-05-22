@@ -40,7 +40,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     var imageUri = mutableStateOf<Uri?>(null)
     var aboutMe = mutableStateOf("")
     var occupation = mutableStateOf("")
-    var genderInterest = mutableStateOf("") // New field for gender interest
+    var genderInterest = mutableStateOf("") // Gender interest field
+    var gender = mutableStateOf("") // New field for user's own gender
 
     private val _photoAnalysisFeedback = MutableLiveData<String?>()
     val photoAnalysisFeedback: LiveData<String?> = _photoAnalysisFeedback
@@ -57,7 +58,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         imageUri: Uri?,
         aboutMe: String,
         occupation: String,
-        genderInterest: String, // Added parameter
+        genderInterest: String,
+        gender: String, // Added gender parameter
         hobbies: List<String> = emptyList()
     ) {
         viewModelScope.launch {
@@ -73,12 +75,14 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     avatar = imageUrl,
                     about = aboutMe,
                     occupation = occupation,
-                    genderInterest = genderInterest, // Include in request
+                    genderInterest = genderInterest,
+                    gender = gender, // Include gender in request
                     hobbies = hobbies
                 )
                 Log.d("RegisterViewModel", "Image URL to send: $imageUrl")
                 Log.d("RegisterViewModel", "Hobbies to send: $hobbies")
                 Log.d("RegisterViewModel", "Gender interest to send: $genderInterest")
+                Log.d("RegisterViewModel", "Gender to send: $gender")
                 val response = RetrofitClient.authService.registerUser(request)
                 authResponse.postValue(response)
             } catch (e: Exception) {

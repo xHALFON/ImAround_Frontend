@@ -63,10 +63,22 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             try {
+                Log.d("ProfileViewModel", "Starting updateUserProfile")
+                Log.d("ProfileViewModel", "User ID: $id")
+                Log.d("ProfileViewModel", "Updated user data:")
+                Log.d("ProfileViewModel", "  firstName: '${updatedUser.firstName}'")
+                Log.d("ProfileViewModel", "  lastName: '${updatedUser.lastName}'")
+                Log.d("ProfileViewModel", "  gender: '${updatedUser.gender}'")
+                Log.d("ProfileViewModel", "  genderInterest: '${updatedUser.genderInterest}'")
+                Log.d("ProfileViewModel", "  occupation: '${updatedUser.occupation}'")
+                Log.d("ProfileViewModel", "  about: '${updatedUser.about}'")
+                Log.d("ProfileViewModel", "  hobbies: ${updatedUser.hobbies}")
+
                 // Handle image upload if a new image was selected
                 var finalUser = updatedUser
                 if (imageUri != null) {
                     try {
+                        Log.d("ProfileViewModel", "Uploading image...")
                         val imageUrl = uploadImageToCloudinary(imageUri)
                         // Update the user object with the new avatar URL
                         finalUser = updatedUser.copy(avatar = imageUrl ?: updatedUser.avatar)
@@ -77,25 +89,37 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
 
+                Log.d("ProfileViewModel", "Final user object being sent to server:")
+                Log.d("ProfileViewModel", "  gender: '${finalUser.gender}'")
+                Log.d("ProfileViewModel", "  genderInterest: '${finalUser.genderInterest}'")
+
                 // Update user profile in backend
                 val response: Response<User> = RetrofitClient.authService.updateUser(id, finalUser)
 
+                Log.d("ProfileViewModel", "Server response code: ${response.code()}")
+
                 if (response.isSuccessful && response.body() != null) {
-                    userProfile.postValue(response.body())
+                    val updatedUserFromServer = response.body()!!
+                    Log.d("ProfileViewModel", "Server returned updated user:")
+                    Log.d("ProfileViewModel", "  gender: '${updatedUserFromServer.gender}'")
+                    Log.d("ProfileViewModel", "  genderInterest: '${updatedUserFromServer.genderInterest}'")
+
+                    userProfile.postValue(updatedUserFromServer)
                     onSuccess()
                 } else {
-                    Log.e("ProfileViewModel", "Update failed: ${response.errorBody()?.string()}")
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("ProfileViewModel", "Update failed: $errorBody")
+                    Log.e("ProfileViewModel", "Response code: ${response.code()}")
                     errorMessage.postValue("Update failed")
                     onError()
                 }
             } catch (e: Exception) {
-                Log.e("ProfileViewModel", "Update exception: ${e.message}")
+                Log.e("ProfileViewModel", "Update exception: ${e.message}", e)
                 errorMessage.postValue(e.localizedMessage ?: "Error updating profile")
                 onError()
             }
         }
     }
-
     /**
      * Deletes the user account
      */
@@ -165,7 +189,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         about: String,
         occupation: String,
         selectedImageUri: Uri?,
-        genderInterest: String = ""  // Added genderInterest parameter
+        genderInterest: String = ""  ,
+        gender: String = ""
     ) {
         _formState.value = FormState(
             firstName = firstName,
@@ -174,7 +199,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             about = about,
             occupation = occupation,
             selectedImageUri = selectedImageUri,
-            genderInterest = genderInterest  // Added to form state
+            genderInterest = genderInterest ,
+            gender = gender
         )
         Log.d("ProfileViewModel", "Form state saved: firstName=$firstName, lastName=$lastName, genderInterest=$genderInterest")
     }
@@ -230,7 +256,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val about: String = "",
         val occupation: String = "",
         val selectedImageUri: Uri? = null,
-        val genderInterest: String = ""  // Added genderInterest field
+        val genderInterest: String = ""  ,// Added genderInterest field
+        val gender: String = ""
     )
 
     /**

@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
-import com.example.myapplication.ui.components.DatePickerField
 import com.example.myapplication.ui.components.GenderInterestSelector
 import com.example.myapplication.ui.hobbies.HobbyViewModel
 import java.util.*
@@ -56,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.myapplication.ui.components.HobbyItem
 import com.example.myapplication.ui.components.ModernTextField
 import com.example.myapplication.ui.profile.*
+import com.example.myapplication.ui.components.GenderSelector
 
 @Composable
 fun RegisterScreen(
@@ -79,7 +79,7 @@ fun RegisterScreen(
     var showPreviewDialog by remember { mutableStateOf(false) }
     var showImageOptions by remember { mutableStateOf(false) }
     var tempImageUri by remember { mutableStateOf<Uri?>(null) }
-
+    val gender by remember { registerViewModel.gender }
     // Observe selected hobbies from the HobbyViewModel
     val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
 
@@ -759,6 +759,27 @@ fun RegisterScreen(
                         // Removed duplicate calendar icon
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+
+// Gender Selection
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackgroundColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        GenderSelector(
+                            selectedGender = gender,
+                            onGenderSelected = { registerViewModel.gender.value = it }
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -952,6 +973,8 @@ fun RegisterScreen(
                     onClick = {
                         if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || password.isBlank() || dob.isBlank()) {
                             Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
+                        } else if (gender.isBlank()) {
+                            Toast.makeText(context, "Please select your gender", Toast.LENGTH_SHORT).show()
                         } else if (selectedHobbies.isEmpty()) {
                             Toast.makeText(context, "Please select at least one interest", Toast.LENGTH_SHORT).show()
                             navController.navigate("hobby_selection")
@@ -968,6 +991,7 @@ fun RegisterScreen(
                                 aboutMe = aboutMe,
                                 occupation = occupation,
                                 genderInterest = genderInterest,
+                                gender = gender,
                                 hobbies = selectedHobbies
                             )
                         }
