@@ -46,8 +46,10 @@ import kotlin.math.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
+import com.example.myapplication.R
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -153,30 +155,14 @@ fun SearchScreen(
                 )
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "I'm",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1976D2),
-                        letterSpacing = 1.sp
-                    ),
-                    modifier = Modifier.scale(pulseScale)
-                )
-
-                Text(
-                    text = "Around",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Light,
-                        color = Color(0xFF2196F3),
-                        letterSpacing = 1.sp
-                    ),
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            // החלפת הטקסט בלוגו
+            Image(
+                painter = painterResource(id = R.drawable.iamaround_logo_new),
+                contentDescription = "I'm Around Logo",
+                modifier = Modifier
+                    .scale(pulseScale)
+                    .height(120.dp) // התאם את הגודל לפי הצורך
+            )
         }
 
         // Full screen radar
@@ -224,25 +210,7 @@ fun SearchScreen(
             }
         }
 
-        // Matches list dialog
-        if (showMatchesList) {
-            Dialog(onDismissRequest = { showMatchesList = false }) {
-                EnhancedMatchesList(
-                    confirmedMatches = matches,
-                    pendingMatches = pendingMatches,
-                    receivedMatches = receivedMatches,
-                    onMatchClick = { match ->
-                        selectedMatch = match
-                        showMatchesList = false
-                    },
-                    onApproveMatch = { match ->
-                        viewModel.approveMatch(match.user._id)
-                        showMatchesList = false
-                    },
-                    onClose = { showMatchesList = false }
-                )
-            }
-        }
+
 
         // Selected match user card dialog
         selectedMatch?.let { match ->
@@ -252,7 +220,7 @@ fun SearchScreen(
                     onSwipedLeft = {
                         selectedMatch = null
                         // Remove match
-                        viewModel.unmatchUser(match.user._id)
+                            //  viewModel.unmatchUser(match.user._id)
                     },
                     onSwipedRight = {
                         selectedMatch = null
@@ -292,326 +260,6 @@ fun SearchScreen(
     }
 }
 
-@Composable
-fun EnhancedMatchesList(
-    confirmedMatches: List<UserMatch>,
-    pendingMatches: List<UserMatch>,
-    receivedMatches: List<UserMatch>,
-    onMatchClick: (UserMatch) -> Unit,
-    onApproveMatch: (UserMatch) -> Unit,
-    onClose: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .fillMaxHeight(0.7f),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 8.dp
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // Header with title and close button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Your Matches",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Color(0xFF1976D2)
-                )
-
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE0E0E0))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.Gray
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Show different match states with sections
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Received matches (waiting for your approval)
-                if (receivedMatches.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Waiting for Your Approval",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color(0xFF1976D2)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    items(receivedMatches) { match ->
-                        MatchItem(
-                            match = match,
-                            onClick = { onMatchClick(match) },
-                            onApprove = { onApproveMatch(match) }
-                        )
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Divider()
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-
-                // Pending matches (you liked, waiting for their approval)
-                if (pendingMatches.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Pending Approval",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color(0xFF1976D2)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    items(pendingMatches) { match ->
-                        MatchItem(
-                            match = match,
-                            onClick = { onMatchClick(match) },
-                            onApprove = null
-                        )
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Divider()
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-
-                // Confirmed matches
-                if (confirmedMatches.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Confirmed Matches",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color(0xFF1976D2)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    items(confirmedMatches) { match ->
-                        MatchItem(
-                            match = match,
-                            onClick = { onMatchClick(match) },
-                            onApprove = null
-                        )
-                    }
-                }
-
-                // No matches message
-                if (confirmedMatches.isEmpty() && pendingMatches.isEmpty() && receivedMatches.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No matches yet. Keep searching!",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.Gray,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MatchItem(
-    match: UserMatch,
-    onClick: () -> Unit,
-    onApprove: (() -> Unit)?
-) {
-    val loadingDots by rememberInfiniteTransition().animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-
-    val dots = when {
-        loadingDots < 0.33f -> "."
-        loadingDots < 0.66f -> ".."
-        else -> "..."
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(match.user.avatar),
-                contentDescription = "User Avatar",
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .border(2.dp,
-                        when (match.status) {
-                            MatchStatus.CONFIRMED -> Color(0xFF4CAF50)
-                            MatchStatus.PENDING -> Color(0xFFFFA000)
-                            MatchStatus.RECEIVED -> Color(0xFF2196F3)
-                        },
-                        CircleShape
-                    )
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "${match.user.firstName} ${match.user.lastName}",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val statusText = when (match.status) {
-                        MatchStatus.CONFIRMED -> "Matched"
-                        MatchStatus.PENDING -> "Pending approval$dots"
-                        MatchStatus.RECEIVED -> "Waiting for your approval"
-                    }
-
-                    val statusColor = when (match.status) {
-                        MatchStatus.CONFIRMED -> Color(0xFF4CAF50)
-                        MatchStatus.PENDING -> Color(0xFFFFA000)
-                        MatchStatus.RECEIVED -> Color(0xFF2196F3)
-                    }
-
-                    Icon(
-                        imageVector = when (match.status) {
-                            MatchStatus.CONFIRMED -> Icons.Default.Favorite
-                            MatchStatus.PENDING -> Icons.Default.Schedule
-                            MatchStatus.RECEIVED -> Icons.Default.PersonAdd
-                        },
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = statusColor
-                    )
-                }
-            }
-
-            // Action buttons based on status
-            when (match.status) {
-                MatchStatus.RECEIVED -> {
-                    if (onApprove != null) {
-                        IconButton(
-                            onClick = onApprove,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4CAF50).copy(alpha = 0.1f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Approve",
-                                tint = Color(0xFF4CAF50)
-                            )
-                        }
-                    }
-                }
-                MatchStatus.CONFIRMED -> {
-                    IconButton(
-                        onClick = { /* Navigate to chat */ },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF2196F3).copy(alpha = 0.1f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Message,
-                            contentDescription = "Chat",
-                            tint = Color(0xFF2196F3)
-                        )
-                    }
-                }
-                MatchStatus.PENDING -> {
-                    // Show loading dots animation for pending
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = dots,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = Color(0xFFFFA000)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun SwipeableMatchCard(
