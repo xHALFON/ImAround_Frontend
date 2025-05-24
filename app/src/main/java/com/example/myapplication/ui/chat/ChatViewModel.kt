@@ -379,4 +379,26 @@ class ChatViewModel : ViewModel() {
         typingJob?.cancel()
         repository.disconnectSocket()
     }
+    fun ensureSocketConnection(userId: String) {
+        Log.d(TAG, "🔥 Ensuring socket connection in ChatViewModel for user: $userId")
+
+        if (!repository.isSocketConnected()) {
+            Log.d(TAG, "🔥 Socket not connected in ChatViewModel, reconnecting...")
+            repository.connectSocket(userId)
+        } else {
+            Log.d(TAG, "🔥 Socket already connected in ChatViewModel")
+        }
+    }
+
+    // Function to reconnect socket when app comes back to foreground
+    fun reconnectSocketIfNeeded(userId: String) {
+        Log.d(TAG, "🔥 ChatViewModel checking socket connection for user: $userId")
+
+        viewModelScope.launch {
+            if (!repository.isSocketConnected()) {
+                Log.d(TAG, "🔥 ChatViewModel reconnecting socket...")
+                repository.connectSocket(userId)
+            }
+        }
+    }
 }

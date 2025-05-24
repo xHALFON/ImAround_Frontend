@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "875421236960",
+    "project_id": "i-maround",
+    "storage_bucket": "i-maround.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:875421236960:android:4398dd5d4da97e730b5a85",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3BAxjcT54gRNgdbl1tmyz9XsZTvYlmV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

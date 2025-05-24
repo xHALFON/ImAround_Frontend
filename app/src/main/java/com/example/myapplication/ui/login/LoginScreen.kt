@@ -14,10 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,16 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.myapplication.ui.components.AccountQueryComponent
 import com.example.myapplication.ui.components.BottomComponent
-import com.example.myapplication.ui.components.HeadingTextComponent
 import com.example.myapplication.ui.components.MyTextFieldComponent
-import com.example.myapplication.ui.components.NormalTextComponent
 import com.example.myapplication.ui.components.PasswordTextFieldComponent
-import com.example.myapplication.ui.login.LoginViewModel
-import com.example.myapplication.ui.theme.AccentColor
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.R
 

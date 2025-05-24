@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -47,6 +48,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.material3.android)
+    implementation(libs.androidx.lifecycle.process)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -81,5 +83,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation ("com.google.accompanist:accompanist-swiperefresh:0.32.0")
     implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
-
+    implementation("com.google.firebase:firebase-messaging:23.2.1")
+    implementation("com.google.firebase:firebase-analytics:21.3.0")
+    implementation("com.google.firebase:firebase-auth:22.1.1")
 }
