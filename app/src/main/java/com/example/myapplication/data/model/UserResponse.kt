@@ -5,7 +5,10 @@ data class UserResponse(
     val firstName: String = "",
     val lastName: String = "",
     val email: String = "",
-    val avatar: String = ""
+    val avatar: String = "",
+    val birthDate: String = "",
+    val occupation: String = ""
+
 )
 
 
