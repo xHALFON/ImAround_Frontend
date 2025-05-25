@@ -79,6 +79,7 @@ fun RegisterScreen(
     var showPreviewDialog by remember { mutableStateOf(false) }
     var showImageOptions by remember { mutableStateOf(false) }
     var tempImageUri by remember { mutableStateOf<Uri?>(null) }
+    var isRegistering by remember { mutableStateOf(false) }
     val gender by remember { registerViewModel.gender }
     // Observe selected hobbies from the HobbyViewModel
     val selectedHobbies by hobbyViewModel.selectedHobbies.observeAsState(emptyList())
@@ -176,14 +177,16 @@ fun RegisterScreen(
     // Handle auth response
     LaunchedEffect(authResponse) {
         authResponse?.let {
+            isRegistering = false // Reset loading state
             Toast.makeText(context, "Registered successfully!", Toast.LENGTH_SHORT).show()
             navController.navigate("login")
         }
     }
 
-    // Handle error messages
+// Handle error messages
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
+            isRegistering = false // Reset loading state on error
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
         }
     }
@@ -1001,6 +1004,7 @@ fun RegisterScreen(
                         } else if (genderInterest.isBlank()) {
                             Toast.makeText(context, "Please select who you're interested in", Toast.LENGTH_SHORT).show()
                         } else {
+                            isRegistering = true
                             registerViewModel.registerUser(
                                 firstName = firstName,
                                 lastName = lastName,
@@ -1016,20 +1020,42 @@ fun RegisterScreen(
                             )
                         }
                     },
+                    enabled = !isRegistering, // Disable button while registering
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .shadow(8.dp, RoundedCornerShape(28.dp)),
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SecondaryColor
+                        containerColor = if (isRegistering) Color.Gray else SecondaryColor,
+                        disabledContainerColor = Color.Gray
                     )
                 ) {
-                    Text(
-                        text = "Create Account",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (isRegistering) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Creating Account...",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Create Account",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
