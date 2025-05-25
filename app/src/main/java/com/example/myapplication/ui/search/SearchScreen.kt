@@ -670,7 +670,7 @@ fun MatchConfirmationAnimation(
 
             // Message with username
             matchedUser?.let {
-                val username = "${it.firstName} ${it.lastName}"
+                val username = "${it.firstName}"
 
                 Text(
                     text = "You matched with $username",
