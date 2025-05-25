@@ -318,7 +318,6 @@ fun RegisterScreen(
             }
         }
     }
-
     // Image preview dialog
     if (showPreviewDialog && tempImageUri != null) {
         Dialog(onDismissRequest = {
@@ -348,38 +347,58 @@ fun RegisterScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // Profile image centered
                     Box(
-                        modifier = Modifier
-                            .size(300.dp)
-                            .aspectRatio(1f)
-                            .clip(CircleShape)
-                            .shadow(8.dp, CircleShape)
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = rememberAsyncImagePainter(tempImageUri),
                             contentDescription = "Profile Preview",
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .size(250.dp)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .shadow(8.dp, CircleShape),
                             contentScale = ContentScale.Crop
                         )
+                    }
 
-                        if (photoAnalysisFeedback == null && !isAnalyzingPhoto && !showPhotoTip) {
-                            FloatingActionButton(
-                                onClick = {
-                                    tempImageUri?.let {
-                                        registerViewModel.analyzeProfilePhoto(it)
-                                        showPhotoTip = true
-                                    }
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(16.dp)
-                                    .size(48.dp),
-                                containerColor = PrimaryColor
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Lightbulb icon positioned below the image
+                    if (!isAnalyzingPhoto) {
+                        FloatingActionButton(
+                            onClick = {
+                                tempImageUri?.let {
+                                    registerViewModel.analyzeProfilePhoto(it)
+                                    showPhotoTip = true
+                                }
+                            },
+                            modifier = Modifier.size(48.dp),
+                            containerColor = PrimaryColor
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = "Analyze photo",
+                                tint = Color.White
+                            )
+                        }
+                    } else {
+                        // Show loading indicator when analyzing
+                        Card(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            colors = CardDefaults.cardColors(containerColor = PrimaryColor)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lightbulb,
-                                    contentDescription = "Analyze photo",
-                                    tint = Color.White
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
                                 )
                             }
                         }
@@ -498,8 +517,9 @@ fun RegisterScreen(
                                 .weight(1f)
                                 .height(56.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryColor
+                            border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = TextSecondaryColor
                             )
                         ) {
                             Text(
