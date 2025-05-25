@@ -258,7 +258,7 @@ private fun ChatItem(
     } ?: ""
 
     val displayName = chatPartner?.let {
-        "${it.firstName} ${it.lastName}".trim().ifEmpty { "Chat Partner" }
+        "${it.firstName}".trim().ifEmpty { "Chat Partner" }
     } ?: "Loading..."
 
     Card(
