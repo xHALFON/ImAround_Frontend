@@ -169,7 +169,7 @@ fun ChatDetailScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "${chatPartner.firstName} ${chatPartner.lastName}".trim()
+                                text = "${chatPartner.firstName}".trim()
                                     .ifEmpty { "Chat Partner" },
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold

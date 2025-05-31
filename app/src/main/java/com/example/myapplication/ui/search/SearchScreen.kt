@@ -46,11 +46,14 @@ import kotlin.math.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.key.Key.Companion.Calendar
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import com.example.myapplication.R
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.random.Random
 
 @Composable
@@ -667,7 +670,7 @@ fun MatchConfirmationAnimation(
 
             // Message with username
             matchedUser?.let {
-                val username = "${it.firstName} ${it.lastName}"
+                val username = "${it.firstName}"
 
                 Text(
                     text = "You matched with $username",
@@ -901,6 +904,52 @@ fun ModernRadarBackground(
     }
 }
 
+// Function to calculate age from birthdate
+fun calculateAge(birthDate: String): Int {
+    return try {
+        // If birthDate is in DD/MM/YYYY format
+        val parts = birthDate.split("/")
+        if (parts.size == 3) {
+            val calendar = java.util.Calendar.getInstance()
+            val currentYear = calendar.get(java.util.Calendar.YEAR)
+            val currentMonth = calendar.get(java.util.Calendar.MONTH) + 1
+            val currentDay = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+
+            val birthYear = parts[2].toInt()
+            val birthMonth = parts[1].toInt()
+            val birthDay = parts[0].toInt()
+
+            var age = currentYear - birthYear
+
+            // Adjust age if birthday hasn't occurred yet this year
+            if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
+                age--
+            }
+
+            age
+        } else {
+            // Attempt to parse as ISO format (YYYY-MM-DD)
+            val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val birthDateParsed = format.parse(birthDate)
+            val calendar = java.util.Calendar.getInstance()
+
+            val birthCalendar = java.util.Calendar.getInstance()
+            birthCalendar.time = birthDateParsed
+
+            var age = calendar.get(java.util.Calendar.YEAR) - birthCalendar.get(java.util.Calendar.YEAR)
+
+            if (calendar.get(java.util.Calendar.DAY_OF_YEAR) < birthCalendar.get(java.util.Calendar.DAY_OF_YEAR)) {
+                age--
+            }
+
+            age
+        }
+    } catch (e: Exception) {
+        // Return a placeholder age if parsing fails
+        0
+    }
+}
+
 @Composable
 fun SwipeableUserCard(
     user: UserResponse,
@@ -911,6 +960,9 @@ fun SwipeableUserCard(
     var offsetX by remember { mutableStateOf(0f) }
     val swipeThreshold = 150f
     val alpha = (abs(offsetX) / swipeThreshold).coerceIn(0f, 1f)
+
+    // Calculate age from date of birth
+    val age = remember(user.birthDate) { calculateAge(user.birthDate ?: "") }
 
     // Background colors for swipe indication
     Box(
@@ -1009,8 +1061,9 @@ fun SwipeableUserCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Display first name and age
                 Text(
-                    text = "${user.firstName} ${user.lastName}",
+                    text = if (age > 0) "${user.firstName}, $age" else user.firstName,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold
                     )
@@ -1018,8 +1071,9 @@ fun SwipeableUserCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Display occupation instead of email
                 Text(
-                    text = user.email,
+                    text = user.occupation ?: "No occupation specified",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.Gray
                 )
