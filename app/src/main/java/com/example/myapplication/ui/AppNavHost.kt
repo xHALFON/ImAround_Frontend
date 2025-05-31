@@ -33,7 +33,8 @@ import java.net.URLDecoder
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    searchViewModel: SearchViewModel? = null
+    searchViewModel: SearchViewModel? = null,
+    startDestination: String = "login"
 ) {
     val context = LocalContext.current
     val sessionManager = SessionManager(context)
@@ -41,7 +42,7 @@ fun AppNavHost(
     val profileViewModel: ProfileViewModel = viewModel()
     val chatViewModel: ChatViewModel = viewModel()
 
-    NavHost(navController = navController, startDestination = "login") {
+    NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(navController)
         }
