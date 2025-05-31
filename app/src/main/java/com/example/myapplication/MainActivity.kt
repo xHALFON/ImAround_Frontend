@@ -10,7 +10,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.data.local.SessionManager
-import com.example.myapplication.data.network.SocketManager
 import com.example.myapplication.ui.AppNavHost
 import com.example.myapplication.ui.chat.ChatViewModel
 import com.example.myapplication.ui.search.SearchViewModel
@@ -36,8 +35,12 @@ class MainActivity : ComponentActivity() {
         searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
         chatViewModel = ViewModelProvider(this)[ChatViewModel::class.java]
 
+        // בדיקת מצב התחברות - זה השינוי היחיד!
+        val isUserLoggedIn = sessionManager.isLoggedIn()
+        Log.d(TAG, "🔥 User login status: $isUserLoggedIn")
+
         // Initialize data if user is logged in
-        if (sessionManager.getUserId() != null) {
+        if (isUserLoggedIn) {
             Log.d(TAG, "🔥 User is logged in, loading initial data")
             searchViewModel.loadMatches()
         }
@@ -48,8 +51,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             SimpleLoginScreenTheme {
                 val navController = rememberNavController()
+
+                // השינוי היחיד - startDestination דינמי
                 AppNavHost(
                     navController = navController,
+                    startDestination = if (isUserLoggedIn) "main" else "login", // 👈 זה השינוי היחיד!
                     searchViewModel = searchViewModel
                 )
             }
