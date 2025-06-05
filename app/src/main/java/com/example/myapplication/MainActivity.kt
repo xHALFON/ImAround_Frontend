@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
         chatViewModel = ViewModelProvider(this)[ChatViewModel::class.java]
 
-        // בדיקת מצב התחברות - זה השינוי היחיד!
+        // בדיקת מצב התחברות - מעודכן לGoogle Sign-In!
         val isUserLoggedIn = sessionManager.isLoggedIn()
         Log.d(TAG, "🔥 User login status: $isUserLoggedIn")
 
@@ -52,12 +52,44 @@ class MainActivity : ComponentActivity() {
             SimpleLoginScreenTheme {
                 val navController = rememberNavController()
 
-                // השינוי היחיד - startDestination דינמי
+                // 🆕 לוגיקה מעודכנת ל-startDestination (זה החלק החדש!)
+                val startDestination = determineStartDestination()
+
+                Log.d(TAG, "🔥 Start destination: $startDestination")
+
                 AppNavHost(
                     navController = navController,
-                    startDestination = if (isUserLoggedIn) "main" else "login", // 👈 זה השינוי היחיד!
+                    startDestination = startDestination,
                     searchViewModel = searchViewModel
                 )
+            }
+        }
+    }
+
+    // 🆕 פונקציה חדשה לקביעת איפה להתחיל
+    private fun determineStartDestination(): String {
+        val isLoggedIn = sessionManager.isLoggedIn()
+        val needsCompletion = sessionManager.needsProfileCompletion()
+        val isGoogleUser = sessionManager.isGoogleUser()
+
+        // Debug info
+        Log.d(TAG, "🔍 Navigation decision:")
+        Log.d(TAG, "   - Is logged in: $isLoggedIn")
+        Log.d(TAG, "   - Is Google user: $isGoogleUser")
+        Log.d(TAG, "   - Needs completion: $needsCompletion")
+
+        return when {
+            !isLoggedIn -> {
+                Log.d(TAG, "   → Going to: login")
+                "login"
+            }
+            needsCompletion -> {
+                Log.d(TAG, "   → Going to: complete_profile")
+                "complete_profile"
+            }
+            else -> {
+                Log.d(TAG, "   → Going to: main")
+                "main"
             }
         }
     }

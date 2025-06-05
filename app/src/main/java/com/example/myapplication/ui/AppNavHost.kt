@@ -22,6 +22,7 @@ import com.example.myapplication.ui.mainscreen.MainScreen
 import com.example.myapplication.ui.profile.EditProfileScreen
 import com.example.myapplication.ui.profile.ProfileScreen
 import com.example.myapplication.ui.profile.ProfileViewModel
+import com.example.myapplication.ui.login.CompleteProfileScreen  // 🆕 הוסף את זה
 import com.example.myapplication.ui.register.RegisterScreen
 import com.example.myapplication.ui.search.SearchScreen
 import com.example.myapplication.ui.search.SearchViewModel
@@ -49,6 +50,14 @@ fun AppNavHost(
 
         composable("register") {
             RegisterScreen(navController, hobbyViewModel = hobbyViewModel)
+        }
+
+        // 🆕 הוסף את המסך החדש הזה:
+        composable("complete_profile") {
+            CompleteProfileScreen(
+                navController = navController,
+                hobbyViewModel = hobbyViewModel  // משתמש באותו HobbyViewModel
+            )
         }
 
         composable("hobby_selection") {

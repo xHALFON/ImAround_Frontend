@@ -5,6 +5,8 @@ import LoginRequest
 import RegisterRequest
 import com.example.myapplication.data.model.UserResponse
 import com.example.myapplication.model.User
+import com.example.myapplication.ui.login.GoogleAuthRequest
+import com.example.myapplication.ui.login.GoogleAuthResponse
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
@@ -34,5 +36,23 @@ interface AuthService {
 
     @DELETE("/auth/deleteUser/{userId}")
     suspend fun deleteUser(@Path("userId") userId: String): Response<Void>
+    @POST("/auth/google")
+    suspend fun googleAuth(@Body request: GoogleAuthRequest): GoogleAuthResponse
 
+    @PUT("/auth/complete-google-profile/{userId}")
+    suspend fun completeGoogleProfile(
+        @Path("userId") userId: String,
+        @Body profileData: CompleteProfileRequest
+    ): GoogleAuthResponse
+
+    // Data class for completing Google profile
+    data class CompleteProfileRequest(
+        val birthDate: String,
+        val gender: String,
+        val genderInterest: String,
+        val about: String,
+        val occupation: String,
+        val hobbies: List<String>
+
+    )
 }

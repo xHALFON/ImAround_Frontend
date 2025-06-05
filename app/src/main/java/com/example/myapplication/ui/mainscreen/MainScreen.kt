@@ -41,6 +41,11 @@ import com.example.myapplication.ui.chat.compose.ChatListScreen
 import com.google.gson.Gson
 import java.net.URLEncoder
 
+// 🔥 NEW IMPORTS for Session Management
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 sealed class BottomNavItem(val route: String, val icon: Any, val label: String) {
     object Profile : BottomNavItem("profileTab", Icons.Default.AccountCircle, "Profile")
@@ -50,6 +55,14 @@ sealed class BottomNavItem(val route: String, val icon: Any, val label: String) 
 
 @Composable
 fun MainScreen(navController: NavHostController, startWithChatTab: Boolean = false) {
+    val context = LocalContext.current
+
+    // 🔥 NEW - Session Manager
+    val sessionManager = remember { SessionManager(context) }
+
+    // 🆕 NEW - Reactive session state using StateFlow
+    val sessionState by sessionManager.sessionState.collectAsStateWithLifecycle()
+
     val items = listOf(
         BottomNavItem.Chat,
         BottomNavItem.Scan,
@@ -60,8 +73,55 @@ fun MainScreen(navController: NavHostController, startWithChatTab: Boolean = fal
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    // 🆕 React to session state changes
+    LaunchedEffect(sessionState) {
+        Log.d("MainScreen", "🔄 Session state changed to: $sessionState")
+
+        when (sessionState) {
+            SessionManager.SessionState.LOGGED_OUT,
+            SessionManager.SessionState.EXPIRED -> {
+                Log.d("MainScreen", "❌ Session invalid - redirecting to login")
+                navController.navigate("login") {
+                    popUpTo(0) { inclusive = true }
+                }
+                return@LaunchedEffect
+            }
+            SessionManager.SessionState.LOGGED_IN -> {
+                Log.d("MainScreen", "✅ Session valid - staying in main screen")
+            }
+            SessionManager.SessionState.UNKNOWN -> {
+                Log.d("MainScreen", "❓ Session state unknown - checking...")
+                sessionManager.refreshSessionState()
+            }
+        }
+    }
+
+    // 🔥 NEW - LIFECYCLE-AWARE SESSION CHECK
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    Log.d("MainScreen", "🔄 App resumed - refreshing session state...")
+                    sessionManager.refreshSessionState()
+                }
+                Lifecycle.Event.ON_START -> {
+                    Log.d("MainScreen", "▶️ App started - refreshing session state...")
+                    sessionManager.refreshSessionState()
+                }
+                else -> {}
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(startWithChatTab) {
-        if (startWithChatTab) {
+        if (startWithChatTab && sessionState == SessionManager.SessionState.LOGGED_IN) {
             bottomNavController.navigate(BottomNavItem.Chat.route) {
                 popUpTo(bottomNavController.graph.findStartDestination().id) {
                     saveState = true
@@ -71,6 +131,13 @@ fun MainScreen(navController: NavHostController, startWithChatTab: Boolean = fal
             }
         }
     }
+
+    // 🆕 Don't render MainScreen if session is not valid
+    if (sessionState != SessionManager.SessionState.LOGGED_IN) {
+        Log.d("MainScreen", "⏳ Waiting for valid session state. Current: $sessionState")
+        return
+    }
+
     Scaffold(
         bottomBar = {
             Box(
@@ -129,6 +196,13 @@ fun MainScreen(navController: NavHostController, startWithChatTab: Boolean = fal
                                 isSelected = currentDestination?.hierarchy?.any { it.route == BottomNavItem.Profile.route } == true,
                                 onClick = {
                                     Log.d("MainScreen", "Clicking Profile button")
+
+                                    // 🆕 SIMPLIFIED - Just check current session state
+                                    if (sessionState != SessionManager.SessionState.LOGGED_IN) {
+                                        Log.d("MainScreen", "❌ Session not valid when clicking profile")
+                                        return@BottomNavItemView
+                                    }
+
                                     bottomNavController.navigate(BottomNavItem.Profile.route) {
                                         popUpTo(bottomNavController.graph.findStartDestination().id) {
                                             saveState = true

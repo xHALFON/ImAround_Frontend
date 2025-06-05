@@ -42,538 +42,597 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.floor
 
+// 🔥 NEW IMPORTS for Session Management
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.myapplication.data.local.SessionManager
+
+// Modern Color Palette
+object ModernColors {
+    val PrimaryBlue = Color(0xFF2563EB)
+    val SecondaryBlue = Color(0xFF3B82F6)
+    val LightBlue = Color(0xFFDBEAFE)
+    val SoftGray = Color(0xFFF8FAFC)
+    val MediumGray = Color(0xFF64748B)
+    val DarkGray = Color(0xFF1E293B)
+    val Success = Color(0xFF10B981)
+    val Danger = Color(0xFFEF4444)
+    val Warning = Color(0xFFF59E0B)
+    val CardBackground = Color(0xFFFFFFFF)
+    val DividerColor = Color(0xFFE2E8F0)
+}
+
 @Composable
 fun ProfileScreen(
     navController: NavController,
     viewModel: ProfileViewModel = viewModel(LocalContext.current as ViewModelStoreOwner)
 ) {
     val context = LocalContext.current
+
+    // 🔥 NEW - Session Manager
+    val sessionManager = remember { SessionManager(context) }
+    val profileViewModel: ProfileViewModel = viewModel()
     val user by viewModel.userProfile.observeAsState()
     val error by viewModel.errorMessage.observeAsState()
     val logoutSuccess by viewModel.logoutSuccess.observeAsState()
     val deleteAccountSuccess by viewModel.deleteAccountSuccess.observeAsState()
     val scrollState = rememberScrollState()
 
-    // State for delete account confirmation dialog
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
-    // Load profile
     LaunchedEffect(Unit) {
+        profileViewModel.logoutSuccess.value = false
+        Log.d("ProfileScreen", "🔄 Reset logoutSuccess to false")
+    }
+
+    // 🔥 NEW - SESSION VALIDATION on screen load
+    LaunchedEffect(Unit) {
+        Log.d("ProfileScreen", "🔍 Checking session validity...")
+
+        val isLoggedIn = sessionManager.isLoggedIn()
+        val userId = sessionManager.getUserId()
+
+        Log.d("ProfileScreen", "🔍 Session check: isLoggedIn=$isLoggedIn, userId=$userId")
+
+        if (!isLoggedIn || userId == null) {
+            Log.d("ProfileScreen", "❌ Session invalid - redirecting to login")
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+            return@LaunchedEffect
+        }
+
+        Log.d("ProfileScreen", "✅ Session valid - loading profile")
         Log.d("InfoTrack", "ProfileScreen: Going To viewModel.loadUserProfile()")
+
         viewModel.loadUserProfile()
     }
 
-    // Handle errors
-    LaunchedEffect(error) {
-        error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-        }
-    }
+    // 🔥 NEW - LIFECYCLE-AWARE SESSION CHECK
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                Log.d("ProfileScreen", "🔄 App resumed - re-checking session...")
 
-    // Handle logout success
-    LaunchedEffect(logoutSuccess) {
-        if (logoutSuccess == true) {
-            navController.navigate("login") {
-                popUpTo(0) { inclusive = true }
-            }
-        }
-    }
+                val isLoggedIn = sessionManager.isLoggedIn()
+                val userId = sessionManager.getUserId()
 
-    // Handle delete account success
-    LaunchedEffect(deleteAccountSuccess) {
-        if (deleteAccountSuccess == true) {
-            Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
-            navController.navigate("login") {
-                popUpTo(0) { inclusive = true }
-            }
-        }
-    }
-
-    // Delete account confirmation dialog
-    if (showDeleteDialog) {
-        DeleteAccountDialog(
-            onDismiss = { showDeleteDialog = false },
-            onConfirm = {
-                showDeleteDialog = false
-                viewModel.deleteAccount()
-            }
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        user?.let {
-            ProfileContent(
-                user = it,
-                onEditProfileClick = { navController.navigate("edit_profile") },
-                onLogoutClick = { viewModel.logout() },
-                onDeleteAccountClick = { showDeleteDialog = true }
-            )
-        } ?: run {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-    }
-}
-
-@Composable
-fun DeleteAccountDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Warning,
-                    contentDescription = null,
-                    tint = Color.Red,
-                    modifier = Modifier.size(48.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Delete Account",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Gray
-                        ),
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                    ) {
-                        Text("Cancel")
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Button(
-                        onClick = onConfirm,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red
-                        ),
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                    ) {
-                        Text("Delete")
+                if (!isLoggedIn || userId == null) {
+                    Log.d("ProfileScreen", "❌ Session expired on resume - redirecting to login")
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             }
         }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // 🔥 ENHANCED - Error handling with auth error detection
+    LaunchedEffect(error) {
+        error?.let { errorMessage ->
+            Log.d("ProfileScreen", "🔍 Checking error: $errorMessage")
+
+            // Check for various auth error patterns
+            val authErrorPatterns = listOf(
+                "unauthorized",
+                "401",
+                "403",
+                "token",
+                "session",
+                "authentication",
+                "invalid credentials",
+                "access denied"
+            )
+
+            val isAuthError = authErrorPatterns.any { pattern ->
+                errorMessage.contains(pattern, ignoreCase = true)
+            }
+
+            if (isAuthError) {
+                Log.d("ProfileScreen", "❌ Auth error detected: $errorMessage - clearing session")
+                sessionManager.clearSession()
+                navController.navigate("login") {
+                    popUpTo(0) { inclusive = true }
+                }
+            } else {
+                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(logoutSuccess) {
+        if (logoutSuccess == true) {
+            Log.d("ProfileScreen", "🚪 Logout success detected - navigating to login")
+
+            // Navigate to login
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+
+            // 🆕 נקה את logoutSuccess אחרי שהניווט הושלם
+            viewModel.afterLogout()
+            Log.d("ProfileScreen", "🔄 Called afterLogout() to clear state")
+        }
+    }
+
+    // Modern Background with subtle gradient
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        ModernColors.SoftGray,
+                        Color.White
+                    ),
+                    startY = 0f,
+                    endY = 800f
+                )
+            )
+    ) {
+        user?.let {
+            ModernProfileContent(
+                user = it,
+                onEditProfileClick = {
+                    // 🔥 NEW - SESSION CHECK before navigation
+                    if (sessionManager.isLoggedIn()) {
+                        navController.navigate("edit_profile")
+                    } else {
+                        Log.d("ProfileScreen", "❌ Session invalid before edit - redirecting to login")
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                },
+                onLogoutClick = { viewModel.logout() }
+            )
+        } ?: run {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    color = ModernColors.PrimaryBlue,
+                    strokeWidth = 3.dp
+                )
+            }
+        }
     }
 }
 
 @Composable
-fun ProfileContent(
+fun ModernProfileContent(
     user: User,
     onEditProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit
+    onLogoutClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Keep the header space, but without the back button
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Empty box just for spacing
-            Spacer(modifier = Modifier.height(32.dp))
-        }
+        Spacer(modifier = Modifier.height(40.dp))
 
-        // Profile image and basic info
-        ProfileHeader(user)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // About section
-        if (!user.about.isNullOrEmpty()) {
-            AboutSection(user.about)
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-
-
-        // Interests section
-        if (user.hobbies?.isNotEmpty() == true) {
-            InterestsSection(user.hobbies)
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        // Action Buttons
-        ActionButtonsSection(
-            onEditProfileClick = onEditProfileClick,
-            onLogoutClick = onLogoutClick,
-            onDeleteAccountClick = onDeleteAccountClick
-        )
+        // Modern Profile Header Card
+        ModernProfileHeader(user)
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        // Content Cards
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // About section in card
+            if (!user.about.isNullOrEmpty()) {
+                ModernAboutCard(user.about)
+            }
+
+            // Interests section in card
+            if (user.hobbies?.isNotEmpty() == true) {
+                ModernInterestsCard(user.hobbies)
+            }
+
+            // Action Buttons Card
+            ModernActionButtonsCard(
+                onEditProfileClick = onEditProfileClick,
+                onLogoutClick = onLogoutClick
+            )
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
     }
 }
 
 @Composable
-fun ActionButtonsSection(
-    onEditProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Edit profile button - Modern gradient style
-        Button(
-            onClick = onEditProfileClick,
-            modifier = Modifier
-                .width(225.dp) // Fixed width instead of fillMaxWidth
-                .height(40.dp)
-                .shadow(
-                    elevation = 4.dp,
-                    shape = RoundedCornerShape(28.dp)
-                ),
-            shape = RoundedCornerShape(28.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Edit,
-                    contentDescription = "Edit Profile",
-                    tint = Color.White
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = "Edit Profile",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Logout button - Outlined style
-        OutlinedButton(
-            onClick = onLogoutClick,
-            modifier = Modifier
-                .width(225.dp) // Fixed width instead of fillMaxWidth
-                .height(40.dp),
-            shape = RoundedCornerShape(28.dp),
-            border = ButtonDefaults.outlinedButtonBorder.copy(
-                width = 2.dp
-            ),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Logout,
-                    contentDescription = "Logout",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = "Logout",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(15.dp))
-
-        // Delete account button - Danger style (kept full width)
-        TextButton(
-            onClick = onDeleteAccountClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.textButtonColors(
-                contentColor = Color.Red
-            )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "Delete Account",
-                    tint = Color.Red
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = "Delete Account",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileHeader(user: User) {
+fun ModernProfileHeader(user: User) {
     val age = calculateAge(user.birthDate)
 
-    Column(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Profile image
-        Image(
-            painter = rememberAsyncImagePainter(
-                model = user.avatar.ifEmpty { "https://ui-avatars.com/api/?name=${user.firstName}&background=random" }
-            ),
-            contentDescription = "Profile Picture",
-            modifier = Modifier
-                .size(250.dp)
-                .clip(CircleShape)
-                .shadow(elevation = 8.dp, shape = CircleShape),
-            contentScale = ContentScale.Crop
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = ModernColors.CardBackground
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 8.dp
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Name and age
-        Row(
-            verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Profile image with modern styling
+            Box(
+                contentAlignment = Alignment.Center
+            ) {
+                // Outer ring
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    ModernColors.PrimaryBlue.copy(alpha = 0.2f),
+                                    ModernColors.SecondaryBlue.copy(alpha = 0.1f)
+                                )
+                            )
+                        )
+                )
+
+                // Profile image
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        model = user.avatar.ifEmpty {
+                            "https://ui-avatars.com/api/?name=${user.firstName}&background=2563EB&color=fff&size=200"
+                        }
+                    ),
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .shadow(
+                            elevation = 12.dp,
+                            shape = RoundedCornerShape(28.dp),
+                            spotColor = ModernColors.PrimaryBlue.copy(alpha = 0.25f)
+                        ),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Name and age with modern typography
             Text(
                 text = "${user.firstName}, $age",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = ModernColors.DarkGray,
+                textAlign = TextAlign.Center
             )
-        }
 
-        // Occupation if available
-        if (!user.occupation.isNullOrEmpty()) {
-            Text(
-                text = user.occupation,
-                fontSize = 16.sp,
-                color = Color.Gray
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Occupation with elegant styling
+            if (!user.occupation.isNullOrEmpty()) {
+                Text(
+                    text = user.occupation,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ModernColors.MediumGray,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
 
 @Composable
-fun AboutSection(about: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "About Me",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        Text(
-            text = about,
-            fontSize = 16.sp,
-            color = Color.DarkGray
+fun ModernAboutCard(about: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = ModernColors.CardBackground
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
         )
-    }
-}
-
-
-
-@Composable
-fun InterestsSection(hobbies: List<String>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(24.dp)
         ) {
-            Text(
-                text = "Interests",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        // Interests/hobbies grid
-        if (hobbies.isNotEmpty()) {
-            // First row
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                hobbies.take(3).forEach { hobby ->
-                    HobbyChip(
-                        hobby = hobby,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = "About",
+                    tint = ModernColors.PrimaryBlue,
+                    modifier = Modifier.size(24.dp)
+                )
 
-                // Fill empty spaces if needed
-                repeat(3 - minOf(hobbies.size, 3)) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "About Me",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ModernColors.DarkGray
+                )
             }
 
-            // Second row if needed
-            if (hobbies.size > 3) {
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    hobbies.drop(3).take(3).forEach { hobby ->
-                        HobbyChip(
-                            hobby = hobby,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    // Fill empty spaces if needed
-                    repeat(3 - minOf(hobbies.size - 3, 3)) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        } else {
             Text(
-                text = "No interests added yet",
-                color = Color.Gray,
-                modifier = Modifier.padding(vertical = 8.dp)
+                text = about,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                color = ModernColors.MediumGray,
+                fontWeight = FontWeight.Normal
             )
         }
     }
 }
 
 @Composable
-fun HobbyChip(
+fun ModernInterestsCard(hobbies: List<String>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = ModernColors.CardBackground
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = "Interests",
+                    tint = ModernColors.PrimaryBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "My Interests",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ModernColors.DarkGray
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Modern grid layout for interests
+            val chunkedHobbies = hobbies.chunked(2)
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                chunkedHobbies.forEach { hobbyPair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        hobbyPair.forEach { hobby ->
+                            ModernHobbyChip(
+                                hobby = hobby,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Fill empty space if odd number
+                        if (hobbyPair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernHobbyChip(
     hobby: String,
     modifier: Modifier = Modifier
 ) {
-    // Map hobby name to color and icon (same as in registration screen)
+    // Modern icon mapping
     val (color, icon) = when (hobby.lowercase()) {
-        "gaming" -> Pair(Color(0xFFBDBDBD), Icons.Filled.SportsEsports)
-        "dancing" -> Pair(Color(0xFFFF8A80), Icons.Filled.MusicNote)
-        "language" -> Pair(Color(0xFF80DEEA), Icons.Filled.Translate)
-        "music" -> Pair(Color(0xFFCE93D8), Icons.Filled.MusicNote)
-        "movie" -> Pair(Color(0xFFF48FB1), Icons.Filled.Movie)
-        "photography" -> Pair(Color(0xFFCFD8DC), Icons.Filled.PhotoCamera)
-        "architecture" -> Pair(Color(0xFFA5D6A7), Icons.Filled.Architecture)
-        "fashion" -> Pair(Color(0xFFF48FB1), Icons.Filled.Checkroom)
-        "book" -> Pair(Color(0xFFCE93D8), Icons.Filled.MenuBook)
-        "writing" -> Pair(Color(0xFF80CBC4), Icons.Filled.Create)
-        "nature" -> Pair(Color(0xFFC5E1A5), Icons.Filled.Park)
-        "painting" -> Pair(Color(0xFFFFF59D), Icons.Filled.Palette)
-        "football" -> Pair(Color(0xFFB0BEC5), Icons.Filled.SportsSoccer)
-        "people" -> Pair(Color(0xFFFFF59D), Icons.Filled.People)
-        "animals" -> Pair(Color(0xFFCE93D8), Icons.Filled.Pets)
-        "fitness" -> Pair(Color(0xFFFFF59D), Icons.Filled.FitnessCenter)
-        else -> Pair(Color(0xFFE0E0E0), Icons.Filled.Star)
+        "gaming" -> Pair(Color(0xFF667EEA), Icons.Filled.SportsEsports)
+        "dancing" -> Pair(Color(0xFFf093fb), Icons.Filled.MusicNote)
+        "language" -> Pair(Color(0xFF4facfe), Icons.Filled.Translate)
+        "music" -> Pair(Color(0xFFa8edea), Icons.Filled.MusicNote)
+        "movie" -> Pair(Color(0xFFfad0c4), Icons.Filled.Movie)
+        "photography" -> Pair(Color(0xFFa8caba), Icons.Filled.PhotoCamera)
+        "architecture" -> Pair(Color(0xFF85d8ce), Icons.Filled.Architecture)
+        "fashion" -> Pair(Color(0xFFfbc2eb), Icons.Filled.Checkroom)
+        "book" -> Pair(Color(0xFF667eea), Icons.Filled.MenuBook)
+        "writing" -> Pair(Color(0xFF764ba2), Icons.Filled.Create)
+        "nature" -> Pair(Color(0xFF56ab2f), Icons.Filled.Park)
+        "painting" -> Pair(Color(0xFFf7971e), Icons.Filled.Palette)
+        "football" -> Pair(Color(0xFF56CCF2), Icons.Filled.SportsSoccer)
+        "people" -> Pair(Color(0xFFFF8A80), Icons.Filled.People)
+        "animals" -> Pair(Color(0xFF9c88ff), Icons.Filled.Pets)
+        "fitness" -> Pair(Color(0xFF11998e), Icons.Filled.FitnessCenter)
+        else -> Pair(ModernColors.MediumGray, Icons.Filled.Star)
     }
 
     Surface(
-        modifier = modifier.height(36.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = color
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = color.copy(alpha = 0.15f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            color.copy(alpha = 0.3f)
+        )
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.Black.copy(alpha = 0.7f),
-                modifier = Modifier.size(18.dp)
+                tint = color,
+                modifier = Modifier.size(20.dp)
             )
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Text(
                 text = hobby.replaceFirstChar { it.uppercase() },
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Black.copy(alpha = 0.8f),
+                color = color,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
+        }
+    }
+}
+
+@Composable
+fun ModernActionButtonsCard(
+    onEditProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = ModernColors.CardBackground
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Edit Profile Button - Primary Modern Style
+            Button(
+                onClick = onEditProfileClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ModernColors.PrimaryBlue
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 12.dp
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = "Edit Profile",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Text(
+                        text = "Edit Profile",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            // Logout Button - Modern Outlined Style
+            OutlinedButton(
+                onClick = onLogoutClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    2.dp,
+                    ModernColors.Danger
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = ModernColors.Danger,
+                    containerColor = Color.Transparent
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Logout,
+                        contentDescription = "Logout",
+                        tint = ModernColors.Danger,
+                        modifier = Modifier.size(22.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Text(
+                        text = "Logout",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ModernColors.Danger,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
         }
     }
 }
@@ -620,6 +679,6 @@ fun calculateAge(birthDate: String): Int {
         }
     } catch (e: Exception) {
         // Return a placeholder age if parsing fails
-        0
+        25
     }
 }
