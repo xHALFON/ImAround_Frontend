@@ -25,10 +25,8 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -73,6 +71,10 @@ fun EditProfileScreen(
 
     // Observe the refreshed user data from viewModel
     val refreshedUser by viewModel.userProfile.observeAsState()
+
+    // 🆕 AI Photo Analysis observables
+    val isAnalyzingPhoto by viewModel.isAnalyzingPhoto.observeAsState(false)
+    val photoAnalysisFeedback by viewModel.photoAnalysisFeedback.observeAsState()
 
     // Check if there's saved form state in the ViewModel
     val savedFormState = viewModel.getSavedFormState()
@@ -132,16 +134,19 @@ fun EditProfileScreen(
             }
         )
     }
-// הוסף LaunchedEffect למעקב אחר שינויים במגדר
+
+    // הוסף LaunchedEffect למעקב אחר שינויים במגדר
     LaunchedEffect(gender) {
         Log.d("EditProfileDebug", "Gender changed to: '$gender'")
     }
+
     // For image handling
     var tempImageUri by rememberSaveable { mutableStateOf<Uri?>(null) } // Temporary URI for preview only
     var selectedImageUri by rememberSaveable { mutableStateOf<Uri?>(savedFormState.selectedImageUri) } // Final selected image for display
     var currentAvatarUrl by rememberSaveable { mutableStateOf(user.avatar) }
     var showImageOptions by rememberSaveable { mutableStateOf(false) }
     var showImagePreview by rememberSaveable { mutableStateOf(false) }
+    var showPhotoTip by rememberSaveable { mutableStateOf(false) } // 🆕 AI analysis tip state
 
     val initialized = rememberSaveable { mutableStateOf(false) }
 
@@ -335,25 +340,20 @@ fun EditProfileScreen(
                     // Camera option
                     ElevatedButton(
                         onClick = {
-                            // Simple approach without using early returns
                             var shouldLaunchCamera = true
 
-                            // Request camera permission first if needed
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                                 val hasPermission = context.checkSelfPermission(Manifest.permission.CAMERA) ==
                                         PackageManager.PERMISSION_GRANTED
 
                                 if (!hasPermission) {
-                                    // Request camera permission
                                     permissionLauncher.launch(Manifest.permission.CAMERA)
                                     shouldLaunchCamera = false
                                 }
                             }
 
-                            // Only proceed if we should launch camera
                             if (shouldLaunchCamera) {
                                 try {
-                                    // Create a Uri for the camera to save the photo to
                                     val photoUri = createImageUri()
                                     if (photoUri != null) {
                                         tempImageUri = photoUri
@@ -408,11 +408,13 @@ fun EditProfileScreen(
         }
     }
 
-    // Image preview dialog
+    // 🆕 Enhanced Image preview dialog with AI analysis
     if (showImagePreview && tempImageUri != null) {
         Dialog(onDismissRequest = {
             showImagePreview = false
-            tempImageUri = null // Clear temporary URI if cancelled
+            tempImageUri = null
+            viewModel.clearPhotoAnalysisFeedback()
+            showPhotoTip = false
         }) {
             Card(
                 modifier = Modifier
@@ -435,31 +437,150 @@ fun EditProfileScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // Profile image preview
                     Box(
-                        modifier = Modifier
-                            .size(300.dp)
-                            .aspectRatio(1f)
-                            .clip(CircleShape)
-                            .shadow(8.dp, CircleShape)
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = rememberAsyncImagePainter(tempImageUri),
                             contentDescription = "Profile Preview",
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .size(250.dp)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .shadow(8.dp, CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 🆕 AI Analysis button (Lightbulb)
+                    if (!isAnalyzingPhoto) {
+                        FloatingActionButton(
+                            onClick = {
+                                tempImageUri?.let {
+                                    viewModel.analyzeProfilePhoto(it)
+                                    showPhotoTip = true
+                                }
+                            },
+                            modifier = Modifier.size(48.dp),
+                            containerColor = PrimaryColor
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = "Analyze photo",
+                                tint = Color.White
+                            )
+                        }
+                    } else {
+                        // Show loading indicator when analyzing
+                        Card(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            colors = CardDefaults.cardColors(containerColor = PrimaryColor)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // 🆕 Show photo analysis feedback if available
+                    if (showPhotoTip) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFF0F4FF)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Lightbulb,
+                                            contentDescription = null,
+                                            tint = PrimaryColor
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Photo Analysis",
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimaryColor
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            showPhotoTip = false
+                                            viewModel.clearPhotoAnalysisFeedback()
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = TextSecondaryColor
+                                        )
+                                    }
+                                }
+
+                                if (isAnalyzingPhoto) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            color = PrimaryColor,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(text = "Analyzing your photo...")
+                                    }
+                                } else {
+                                    Text(
+                                        text = photoAnalysisFeedback ?: "",
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        color = TextPrimaryColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Action buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedButton(
                             onClick = {
-                                tempImageUri = null // Clear temporary URI
+                                tempImageUri = null
                                 showImagePreview = false
+                                viewModel.clearPhotoAnalysisFeedback()
+                                showPhotoTip = false
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -481,6 +602,8 @@ fun EditProfileScreen(
                                 // Only assign to selectedImageUri when "Use Photo" is clicked
                                 selectedImageUri = tempImageUri
                                 showImagePreview = false
+                                viewModel.clearPhotoAnalysisFeedback()
+                                showPhotoTip = false
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -654,7 +777,7 @@ fun EditProfileScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-// Gender Selection
+                // Gender Selection
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -711,7 +834,7 @@ fun EditProfileScreen(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Dating Preferences Section - NEW
+                // Dating Preferences Section
                 Text(
                     text = "Dating Preferences",
                     fontSize = 18.sp,
@@ -732,7 +855,6 @@ fun EditProfileScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-
                         GenderInterestSelector(
                             selectedGender = genderInterest,
                             onGenderSelected = { genderInterest = it }
@@ -742,7 +864,7 @@ fun EditProfileScreen(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Interests section - Redesigned to match ProfileScreen
+                // Interests section
                 Text(
                     text = "Interests",
                     fontSize = 18.sp,
@@ -788,7 +910,7 @@ fun EditProfileScreen(
                                         about = about,
                                         occupation = occupation,
                                         selectedImageUri = selectedImageUri,
-                                        genderInterest = genderInterest  ,// Add gender interest to saved form state
+                                        genderInterest = genderInterest,
                                         gender = gender
                                     )
 
@@ -812,7 +934,6 @@ fun EditProfileScreen(
 
                         // Interests/hobbies chips
                         if (selectedHobbies.isNotEmpty()) {
-                            // Using a FlowRow-like arrangement with multiple rows as needed
                             selectedHobbies.chunked(3).forEachIndexed { index, rowHobbies ->
                                 if (index > 0) {
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -860,7 +981,7 @@ fun EditProfileScreen(
                                 about = about,
                                 occupation = occupation,
                                 hobbies = selectedHobbies,
-                                genderInterest = genderInterest , // Add gender interest to updated user
+                                genderInterest = genderInterest,
                                 gender = gender
                             ),
                             imageUri = selectedImageUri,
