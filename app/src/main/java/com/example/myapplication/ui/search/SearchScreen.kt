@@ -75,6 +75,12 @@ fun SearchScreen(
     var selectedMatch by remember { mutableStateOf<UserMatch?>(null) }
     var showMatchConfirmation by remember { mutableStateOf(false) }
     val newMatchId by viewModel.newMatchId.observeAsState()
+
+    // Get screen configuration for responsive design
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val isSmallScreen = screenHeight < 700.dp
+
     // Match confirmed animation
     LaunchedEffect(hasNewMatch) {
         if (hasNewMatch && newMatchUser != null) {
@@ -120,10 +126,14 @@ fun SearchScreen(
         .fillMaxSize()
         .background(Color.White)) {
 
+        // Logo with better spacing and responsive sizing
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 32.dp),
+                .padding(
+                    top = if (isSmallScreen) 24.dp else 32.dp,
+                    bottom = if (isSmallScreen) 16.dp else 24.dp // רווח חדש בתחתית
+                ),
             contentAlignment = Alignment.Center
         ) {
             val infiniteTransition = rememberInfiniteTransition()
@@ -145,10 +155,10 @@ fun SearchScreen(
                 )
             )
 
-            // Subtle radar ping effect
+            // Subtle radar ping effect with adjusted size
             Canvas(
                 modifier = Modifier
-                    .size(240.dp)
+                    .size(if (isSmallScreen) 180.dp else 240.dp)
                     .alpha(0.1f)
             ) {
                 drawCircle(
@@ -158,19 +168,24 @@ fun SearchScreen(
                 )
             }
 
-            // החלפת הטקסט בלוגו
+            // Logo with responsive sizing
             Image(
                 painter = painterResource(id = R.drawable.iamaround_logo_new),
                 contentDescription = "I'm Around Logo",
                 modifier = Modifier
                     .scale(pulseScale)
-                    .height(120.dp) // התאם את הגודל לפי הצורך
+                    .height(if (isSmallScreen) 80.dp else 120.dp) // גודל מותאם למסכים קטנים
             )
         }
 
-        // Full screen radar
+        // Radar background with top margin to avoid logo overlap
         ModernRadarBackground(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = if (isSmallScreen) 140.dp else 180.dp ,// מרווח עליון כדי שלא יחפוף ללוגו
+                    bottom = 120.dp
+                ),
             users = users,
             onUserTap = { selectedUser = it }
         )
@@ -213,8 +228,6 @@ fun SearchScreen(
             }
         }
 
-
-
         // Selected match user card dialog
         selectedMatch?.let { match ->
             Dialog(onDismissRequest = { selectedMatch = null }) {
@@ -223,7 +236,7 @@ fun SearchScreen(
                     onSwipedLeft = {
                         selectedMatch = null
                         // Remove match
-                            //  viewModel.unmatchUser(match.user._id)
+                        //  viewModel.unmatchUser(match.user._id)
                     },
                     onSwipedRight = {
                         selectedMatch = null
@@ -262,7 +275,6 @@ fun SearchScreen(
         }
     }
 }
-
 
 @Composable
 fun SwipeableMatchCard(

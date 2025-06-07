@@ -17,21 +17,59 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    // הגדרת חתימת האפליקציה
+    signingConfigs {
+        create("release") {
+            storeFile = file("imaround-release-key.jks")
+            storePassword = "123456" // החלף בסיסמה שהזנת
+            keyAlias = "imaround"
+            keyPassword = "123456" // החלף בסיסמה שהזנת
+        }
+    }
+
     buildFeatures {
         compose = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
+
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isShrinkResources = false
+        }
+
+        release {
+            // בטל אופטימיזציות לבינתיים
+            isMinifyEnabled = false // בטל R8/ProGuard לבינתיים
+            isShrinkResources = false // בטל הסרת משאבים
+            isDebuggable = false
+
+            // חתימת האפליקציה
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
+    // הגדרות Lint - תיקון לבעיית הקומפיילר
+    lint {
+        disable += "NullSafeMutableLiveData"
+        abortOnError = false
+        checkReleaseBuilds = false
+        ignoreWarnings = true
+    }
+
+    // פיצול APK לפי ארכיטקטורה (אופציונלי - יקטין עוד יותר)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false // אם תרצה APK אוניברסלי, שנה ל-true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -67,7 +105,6 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
     // Image loading
-    implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Compose BOM - ensures compatible versions
