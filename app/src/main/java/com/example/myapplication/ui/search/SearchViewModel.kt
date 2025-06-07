@@ -30,16 +30,24 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        private const val TAG = "SearchViewModel"
+        // 🚀 עדכון לשרת החדש ב-Render
+        private const val SOCKET_URL = "https://imaround-backend.onrender.com/"
+    }
+
     private val repository = BluetoothRepository(application)
     private val sessionManager = SessionManager(application)
     private val backendApi = BackendApi()
     private val socketManager = SocketManager.getInstance()
     val newMatchId = MutableLiveData<String?>()
+
     // שימוש ב-RetrofitClient הקיים
     private val searchService = RetrofitClient.searchService
     private val matchingService = RetrofitClient.matchingService
     private val _socketConnected = MutableLiveData<Boolean>(false)
     val socketConnected: LiveData<Boolean> = _socketConnected
+
     // ID של המשתמש הנוכחי מ-SessionManager
     private val currentUserId: String
         get() = sessionManager.getUserId() ?: "unknown"
@@ -145,7 +153,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
-        socketManager.init("http://10.0.2.2:3000")
+        // 🚀 עדכון לשרת החדש
+        Log.d(TAG, "🔥 Initializing SocketManager with production URL: $SOCKET_URL")
+        socketManager.init(SOCKET_URL)
         setupSocketListeners()
         connectSocket()
 
@@ -179,13 +189,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private fun initializeFCM() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
-                Log.w("SearchViewModel", "Fetching FCM registration token failed", task.exception)
+                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
                 return@addOnCompleteListener
             }
 
             // Get new FCM registration token
             val token = task.result
-            Log.d("SearchViewModel", "FCM Token: $token")
+            Log.d(TAG, "FCM Token: $token")
 
             // שלח את הטוקן לשרת שלך (אופציונלי לעכשיו)
             sendFCMTokenToServer(token)
@@ -193,7 +203,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun sendFCMTokenToServer(token: String) {
-        Log.d("SearchViewModel", "Sending FCM token to server: $token")
+        Log.d(TAG, "Sending FCM token to server: $token")
 
         viewModelScope.launch {
             try {
@@ -204,9 +214,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
                 // 🔥 משתמש ב-matchingService במקום searchService
                 matchingService.saveFCMToken(request)
-                Log.d("SearchViewModel", "✅ FCM token sent successfully to server")
+                Log.d(TAG, "✅ FCM token sent successfully to server")
             } catch (e: Exception) {
-                Log.e("SearchViewModel", "❌ Failed to send FCM token to server", e)
+                Log.e(TAG, "❌ Failed to send FCM token to server", e)
                 // לא נציג שגיאה למשתמש - זה לא קריטי
             }
         }
@@ -307,8 +317,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-
-
         socketManager.setOnMatchSeenListener { matchId ->
             // Update match seen status in your lists
             val confirmedMatches = _matches.value?.toMutableList() ?: mutableListOf()
@@ -329,27 +337,23 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-
-
     fun loadMatches() {
         viewModelScope.launch {
             try {
-
-                Log.d("SearchViewModel", "מאצ'ים נטענו בהצלחה")
+                Log.d(TAG, "מאצ'ים נטענו בהצלחה")
             } catch (e: Exception) {
-                Log.e("SearchViewModel", "שגיאה בטעינת נתוני מאצ' התחלתיים", e)
+                Log.e(TAG, "שגיאה בטעינת נתוני מאצ' התחלתיים", e)
                 _errorMessage.postValue("טעינת מאצ'ים נכשלה: ${e.message}")
             }
         }
     }
-
-
 
     private fun removeUserFromRadar(userId: String) {
         val currentUsers = _usersResponse.value?.toMutableList() ?: mutableListOf()
         currentUsers.removeIf { it._id == userId }
         _usersResponse.postValue(currentUsers)
     }
+
     // פונקציה ללייק משתמש - נקראת בעת החלקה ימינה על כרטיס משתמש
     fun likeUser(targetUserId: String) {
         viewModelScope.launch {
@@ -381,14 +385,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 // Socket will handle the case of it being a match
             } catch (e: Exception) {
-                Log.e("SearchViewModel", "Error liking user", e)
+                Log.e(TAG, "Error liking user", e)
                 _errorMessage.postValue("Error liking user: ${e.message}")
             }
         }
     }
 
     fun dislikeUser(targetUserId: String) {
-
         removeUserFromRadar(targetUserId)
 
         viewModelScope.launch {
@@ -396,10 +399,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 // שליחת בקשת דיסלייק לשרת
                 val request = LikeRequest(currentUserId, targetUserId)
                 matchingService.dislikeUser(request)
-                Log.d("SearchViewModel", "משתמש $currentUserId לא אהב את משתמש $targetUserId - נשלח לשרת")
+                Log.d(TAG, "משתמש $currentUserId לא אהב את משתמש $targetUserId - נשלח לשרת")
             } catch (e: Exception) {
                 // אם נכשל, נרשום לוג אבל לא נודיע למשתמש כי זה לא קריטי
-                Log.e("SearchViewModel", "שגיאה בשליחת dislike לשרת", e)
+                Log.e(TAG, "שגיאה בשליחת dislike לשרת", e)
             }
         }
     }
@@ -441,37 +444,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     removeUserFromRadar(targetUserId)
                 }
             } catch (e: Exception) {
-                Log.e("SearchViewModel", "שגיאה באישור מאצ'", e)
+                Log.e(TAG, "שגיאה באישור מאצ'", e)
                 _errorMessage.postValue("שגיאה באישור מאצ': ${e.message}")
             }
         }
     }
-
-    // פונקציה להסרת מאצ' עם משתמש
-//    fun unmatchUser(targetUserId: String) {
-//        viewModelScope.launch {
-//            try {
-//                // הסרה מכל רשימות המאצ'
-//                val currentConfirmedMatches = _matches.value?.toMutableList() ?: mutableListOf()
-//                currentConfirmedMatches.removeIf { it.user._id == targetUserId }
-//                _matches.postValue(currentConfirmedMatches)
-//
-//                val currentPendingMatches = _pendingMatches.value?.toMutableList() ?: mutableListOf()
-//                currentPendingMatches.removeIf { it.user._id == targetUserId }
-//                _pendingMatches.postValue(currentPendingMatches)
-//
-//                val currentReceivedMatches = _receivedMatches.value?.toMutableList() ?: mutableListOf()
-//                currentReceivedMatches.removeIf { it.user._id == targetUserId }
-//                _receivedMatches.postValue(receivedMatches)
-//
-//                // בדרך כלל היינו גם קוראים ל-API להסרת המאצ' בשרת
-//                // ביישום עתידי
-//            } catch (e: Exception) {
-//                Log.e("SearchViewModel", "שגיאה בהסרת מאצ'", e)
-//                _errorMessage.postValue("שגיאה בהסרת מאצ': ${e.message}")
-//            }
-//        }
-//    }
 
     // ניקוי הדגל של מאצ' חדש כאשר המשתמש צופה במאצ'ים
     fun clearNewMatchFlag() {
@@ -501,28 +478,27 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         repository.stopScanning(scanCallback)
         socketManager.disconnect()
     }
-    // הוסף את הפונקציה הזו ל-SearchViewModel בסוף הקלאס:
 
     // Helper function to ensure socket connection
     fun ensureSocketConnection() {
-        Log.d("SearchViewModel", "🔥 Ensuring socket connection for user: $currentUserId")
+        Log.d(TAG, "🔥 Ensuring socket connection for user: $currentUserId")
 
         if (currentUserId != "unknown" && !socketManager.isConnected()) {
-            Log.d("SearchViewModel", "🔥 Socket not connected, reconnecting...")
+            Log.d(TAG, "🔥 Socket not connected, reconnecting...")
             connectSocket()
         } else {
-            Log.d("SearchViewModel", "🔥 Socket already connected or user unknown")
+            Log.d(TAG, "🔥 Socket already connected or user unknown")
         }
     }
 
     // Function to reconnect socket when app comes back to foreground
     fun reconnectSocketIfNeeded() {
-        Log.d("SearchViewModel", "🔥 SearchViewModel checking socket connection for user: $currentUserId")
+        Log.d(TAG, "🔥 SearchViewModel checking socket connection for user: $currentUserId")
 
         if (currentUserId != "unknown") {
             viewModelScope.launch {
                 if (!socketManager.isConnected()) {
-                    Log.d("SearchViewModel", "🔥 SearchViewModel reconnecting socket...")
+                    Log.d(TAG, "🔥 SearchViewModel reconnecting socket...")
                     connectSocket()
                 }
             }
@@ -531,7 +507,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     // עדכן את הפונקציה connectSocket:
     private fun connectSocket() {
-        Log.d("SearchViewModel", "🔥 Connecting socket for user: $currentUserId")
+        Log.d(TAG, "🔥 Connecting socket for user: $currentUserId to: $SOCKET_URL")
         socketManager.connect(currentUserId)
     }
 }

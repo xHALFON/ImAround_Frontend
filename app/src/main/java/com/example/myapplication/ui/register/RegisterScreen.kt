@@ -321,7 +321,7 @@ fun RegisterScreen(
             }
         }
     }
-    // Image preview dialog
+// 🆕 Enhanced Image preview dialog with AI analysis - FIXED FOR EDIT PROFILE
     if (showPreviewDialog && tempImageUri != null) {
         Dialog(onDismissRequest = {
             showPreviewDialog = false
@@ -332,13 +332,18 @@ fun RegisterScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.85f) // הגבלת גובה הדיאלוג
                     .padding(16.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBackgroundColor),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
+                // הוספת גלילה לכל התוכן
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -359,7 +364,7 @@ fun RegisterScreen(
                             painter = rememberAsyncImagePainter(tempImageUri),
                             contentDescription = "Profile Preview",
                             modifier = Modifier
-                                .size(250.dp)
+                                .size(200.dp) // קטנתי קצת את הגודל למסכים קטנים
                                 .aspectRatio(1f)
                                 .clip(CircleShape)
                                 .shadow(8.dp, CircleShape),
@@ -473,20 +478,28 @@ fun RegisterScreen(
                                         Text(text = "Analyzing your photo...")
                                     }
                                 } else {
+                                    // הוספת גלילה גם לטקסט האנליזה אם הוא ארוך
                                     Text(
                                         text = photoAnalysisFeedback ?: "",
-                                        modifier = Modifier.padding(top = 8.dp),
-                                        color = TextPrimaryColor
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp),
+                                        color = TextPrimaryColor,
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
                             }
                         }
                     }
 
+                    // כפתורים תחתונים - תיקון הסטיילינג
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp), // רווח מלמעלה
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // כפתור Cancel - OutlinedButton
                         OutlinedButton(
                             onClick = {
                                 tempImageUri = null
@@ -509,6 +522,7 @@ fun RegisterScreen(
                             )
                         }
 
+                        // כפתור Use Photo - Button רגיל (תיקון הבעיה!)
                         Button(
                             onClick = {
                                 registerViewModel.imageUri.value = tempImageUri
@@ -520,22 +534,25 @@ fun RegisterScreen(
                                 .weight(1f)
                                 .height(56.dp),
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = TextSecondaryColor
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryColor,
+                                contentColor = Color.White
                             )
                         ) {
                             Text(
-                                text = "Use Photo",
-                                fontWeight = FontWeight.Medium
+                                text = "Select",
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1 // מבטיח שלא יתפצל לשורות
                             )
                         }
                     }
+
+                    // רווח נוסף בתחתית כדי שהכפתורים לא ייחתכו
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
     }
-
     // Main Screen Content
     Surface(
         modifier = Modifier.fillMaxSize(),

@@ -13,6 +13,9 @@ class MyApplication : Application(), DefaultLifecycleObserver {
     companion object {
         private const val TAG = "MyApplication"
 
+        // 🚀 עדכון לשרת החדש ב-Render
+        private const val SOCKET_URL = "https://imaround-backend.onrender.com/"
+
         // Static flag to track app state
         var isAppInForeground = false
             private set
@@ -52,8 +55,8 @@ class MyApplication : Application(), DefaultLifecycleObserver {
 
             // Initialize socket if not already done
             if (!socketManager.isConnected()) {
-                Log.d(TAG, "🔥 Socket not connected, initializing and connecting...")
-                socketManager.init("http://10.0.2.2:3000")
+                Log.d(TAG, "🔥 Socket not connected, initializing and connecting to: $SOCKET_URL")
+                socketManager.init(SOCKET_URL)  // 🚀 עדכון לשרת החדש
                 socketManager.connect(userId)
             } else {
                 Log.d(TAG, "🔥 Socket already connected, but ensuring user registration")
