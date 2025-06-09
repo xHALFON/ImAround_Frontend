@@ -14,8 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -158,7 +157,7 @@ fun SearchScreen(
             // Subtle radar ping effect with adjusted size
             Canvas(
                 modifier = Modifier
-                    .size(if (isSmallScreen) 180.dp else 240.dp)
+                    .size(if (isSmallScreen) 140.dp else 200.dp)
                     .alpha(0.1f)
             ) {
                 drawCircle(
@@ -801,7 +800,12 @@ fun ModernRadarBackground(
         )
     )
 
-    Box(modifier = modifier) {
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = modifier) {
+        val containerWidth = constraints.maxWidth.toFloat()
+        val containerHeight = constraints.maxHeight.toFloat()
+
         // Draw the radar
         Canvas(modifier = Modifier.fillMaxSize()) {
             val centerX = size.width / 2
@@ -849,20 +853,16 @@ fun ModernRadarBackground(
             )
         }
 
-        // Draw users on radar with floating animation
+        // Draw users on radar with floating animation - חישוב נכון יחסית לגודל האמיתי
         users.forEachIndexed { index, user ->
             // Using random with seed based on index for consistent positioning
             val random = Random(user._id.hashCode())
             val randomAngle = remember { (user._id.hashCode() % 360) }
             val randomDistance = remember { random.nextInt(40, 85) / 100f }
 
-            val density = LocalDensity.current
-            val configuration = LocalConfiguration.current
-            val screenWidth = with(density) { configuration.screenWidthDp.dp.toPx() }
-            val screenHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
-
-            val centerX = screenWidth / 2f
-            val centerY = screenHeight / 2f
+            // חישוב על בסיס הגודל האמיתי של הקונטיינר
+            val centerX = containerWidth / 2f
+            val centerY = containerHeight / 2f
             val maxRadius = min(centerX, centerY) * 0.85f
 
             val angleDegrees = randomAngle.toDouble()
